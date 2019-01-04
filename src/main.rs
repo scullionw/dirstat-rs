@@ -1,52 +1,90 @@
 use colored::*;
 use std::env;
+use std::error::Error;
 use std::fs;
 use std::path::Path;
-use std::{error::Error, result};
+use structopt::StructOpt;
 
-type Result<T> = result::Result<T, Box<Error>>;
-
-const MAX_DEPTH: usize = 3;
-
-fn main() -> Result<()> {
+fn main() -> Result<(), Box<Error>> {
+    let config = Config::from_args();
     let current_dir = env::current_dir()?;
-    dir_stats(&current_dir, 0)?;
+    let analysed = DiskItem::new(&current_dir)?;
+    analysed.show(0, config.max_depth);
     Ok(())
 }
 
-fn dir_stats(path: &Path, level: usize) -> Result<()> {
-    let mut dirs = Vec::new();
+struct DiskItem {
+    name: std::ffi::OsString,
+    disk_size: u64,
+    children: Option<Vec<DiskItem>>,
+}
 
-    for entry in fs::read_dir(path)? {
-        if let Ok(entry) = entry {
-            let size = entry.metadata()?.len();
-            if entry.file_type()?.is_dir() {
-                dirs.push((entry, size, level));
+impl DiskItem {
+    fn new(path: &Path) -> Result<Self, Box<Error>> {
+        if path.is_dir() {
+            let mut sub_dirs = vec![];
+            for entry in fs::read_dir(path)? {
+                let disk_item = DiskItem::new(&entry?.path())?;
+                sub_dirs.push(disk_item);
+            }
+            sub_dirs.sort_unstable_by_key(|di| di.disk_size);
+            Ok(DiskItem {
+                name: path.file_name().unwrap().to_os_string(),
+                disk_size: sub_dirs.iter().map(|di| di.disk_size).sum(),
+                children: Some(sub_dirs),
+            })
+        } else {
+            Ok(DiskItem {
+                name: path.file_name().unwrap().to_os_string(),
+                disk_size: path.metadata()?.len(),
+                children: None,
+            })
+        }
+    }
+
+    fn show(&self, level: usize, max_depth: usize) {
+        let padding = "-".repeat(level * 3);
+        match level {
+            0 => self.show_children(level + 1, max_depth),
+            d if d < max_depth => {
+                println!("{}{} => {:?}", padding, self.disk_size, self.name);
+                self.show_children(level + 1, max_depth)
+            }
+            _ => println!("{}{} => {:?}", padding, self.disk_size, self.name),
+        }
+    }
+
+    fn show_children(&self, level: usize, max_depth: usize) {
+        if let Some(disk_items) = &self.children {
+            for disk_item in disk_items.iter().rev() {
+                disk_item.show(level + 1, max_depth)
             }
         }
     }
+}
 
-    let total_size = dirs.iter().map(|&(_, size, _)| size).sum::<u64>();
-    dirs.sort_by_key(|&(_, size, _)| size);
+#[derive(StructOpt, Debug)]
+struct Config {
+    // Maximum recursion depth in directory
+    #[structopt(short = "d", default_value = "3")]
+    max_depth: usize,
 
-    for (entry, size, level) in dirs.into_iter().rev() {
-        let percent = (size as f64 / total_size as f64) * 100.0;
+    // Threshold that determines if entry is worth
+    // being shown. Between 0-100 % of dir size.
+    #[structopt(
+        short = "m",
+        default_value = "1",
+        parse(try_from_str = "parse_percent")
+    )]
+    min_percent: f64,
+}
 
-        let percent = if percent > 20.0 {
-            format!("{:.1}%", percent).red().bold()
-        } else {
-            format!("{:.1}%", percent).blue()
-        };
-
-        let padding = "-".repeat(level * 3);
-
-        println!("{}{} => {:?}", padding, percent, entry.file_name());
-
-        if level < MAX_DEPTH {
-            // Call recursively
-            dir_stats(&entry.path(), level + 1)?;
-        }
+// Custom function to validate input
+fn parse_percent(src: &str) -> Result<f64, Box<Error>> {
+    let num = src.parse::<f64>()?;
+    if num > 0.0 && num < 100.0 {
+        Ok(num)
+    } else {
+        Err("Percentage must be in range [0, 100].".into())
     }
-
-    Ok(())
 }

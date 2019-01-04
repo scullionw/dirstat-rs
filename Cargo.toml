@@ -5,6 +5,5 @@ authors = ["scullionw <scuw1801@usherbrooke.ca>"]
 edition = "2018"
 
 [dependencies]
-glob = "0.2.11"
-walkdir = "2.2.7"
 colored = "1.6.1"
+structopt = "0.2.14"

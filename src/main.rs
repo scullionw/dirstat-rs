@@ -3,14 +3,17 @@ use pretty_bytes::converter::convert as pretty_bytes;
 use rayon::prelude::*;
 use std::env;
 use std::error::Error;
+use std::ffi::OsStr;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 
 fn main() -> Result<(), Box<Error>> {
     let config = Config::from_args();
     let current_dir = env::current_dir()?;
-    let analysed = DiskItem::from_analyze(&current_dir)?;
+    let target_dir = config.target_dir.as_ref().unwrap_or(&current_dir);
+    println!("\n🔧  Analysing dir: {:?}\n", target_dir);
+    let analysed = DiskItem::from_analyze(&target_dir)?;
     analysed.show(&config, None, 0);
     Ok(())
 }
@@ -23,12 +26,11 @@ struct DiskItem {
 
 impl DiskItem {
     fn from_analyze(path: &Path) -> Result<Self, Box<Error>> {
-        let name = path
-            .file_name()
-            .ok_or("Filename could not be read.")?
-            .to_os_string();
+        let name = path.file_name().unwrap_or(&OsStr::new(".")).to_os_string();
 
-        if path.is_dir() {
+        let file_info = path.symlink_metadata()?;
+
+        if file_info.is_dir() {
             let sub_entries = fs::read_dir(path)?
                 .filter_map(Result::ok)
                 .collect::<Vec<_>>();
@@ -49,7 +51,7 @@ impl DiskItem {
             Ok(DiskItem {
                 name,
                 // If we can't read meta_data, set size to 0.
-                disk_size: path.metadata().map(|m| m.len()).unwrap_or(0),
+                disk_size: file_info.len(),
                 children: None,
             })
         }
@@ -101,6 +103,9 @@ struct Config {
     /// Threshold that determines if entry is worth
     /// being shown. Between 0-100 % of dir size.
     min_percent: f64,
+
+    #[structopt(parse(from_os_str))]
+    target_dir: Option<PathBuf>,
 }
 
 fn parse_percent(src: &str) -> Result<f64, Box<Error>> {

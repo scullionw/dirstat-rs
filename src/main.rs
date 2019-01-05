@@ -3,7 +3,7 @@ use pretty_bytes::converter::convert as pretty_bytes;
 use rayon::prelude::*;
 use std::env;
 use std::error::Error;
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<Error>> {
 }
 
 struct DiskItem {
-    name: std::ffi::OsString,
+    name: OsString,
     disk_size: u64,
     children: Option<Vec<DiskItem>>,
 }
@@ -27,7 +27,6 @@ struct DiskItem {
 impl DiskItem {
     fn from_analyze(path: &Path) -> Result<Self, Box<Error>> {
         let name = path.file_name().unwrap_or(&OsStr::new(".")).to_os_string();
-
         let file_info = path.symlink_metadata()?;
 
         if file_info.is_dir() {
@@ -50,7 +49,6 @@ impl DiskItem {
         } else {
             Ok(DiskItem {
                 name,
-                // If we can't read meta_data, set size to 0.
                 disk_size: file_info.len(),
                 children: None,
             })
@@ -61,7 +59,6 @@ impl DiskItem {
         let padding = "-".repeat(level * 3);
         let percent = parent_size.map_or(100.0, |p_s| (self.disk_size as f64 / p_s as f64) * 100.0);
 
-        // Select color
         let percent_repr = if level == 0 {
             format!("{:.2}%", percent).green().bold()
         } else if percent > 20.0 {

@@ -29,3 +29,21 @@
 
     ARGS:
         <target_dir>
+        
+        
+# Installation
+
+    $ cargo install dirstat-rs
+
+# Usage
+
+ 1. Current directory:
+    
+        $ ds
+    
+ 2. Specific path
+ 
+        $ ds PATH
+    
+    
+    

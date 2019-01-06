@@ -89,7 +89,7 @@ dependencies = [
 
 [[package]]
 name = "dirstat-rs"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "colored 1.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pretty-bytes 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",

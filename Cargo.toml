@@ -4,6 +4,7 @@ version = "0.2.0"
 authors = ["scullionw <scuw1801@usherbrooke.ca>"]
 edition = "2018"
 license = "MIT"
+readme = "README.md"
 description = "A disk usage cli similar to windirstat"
 repository = "https://github.com/scullionw/dirstat-rs"
 keywords = ["cli", "disk", "usage", "tree", "windirstat"]

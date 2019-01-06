@@ -1,4 +1,6 @@
 # dirstat-rs
+___
+[![Crates.io](https://img.shields.io/crates/v/dirstat-rs.svg)](https://crates.io/crates/dirstat-rs)
 
 2X faster than du
 
@@ -10,18 +12,17 @@
 (On 4-core hyperthreaded cpu)
 
 
-
     A disk usage cli similar to windirstat
 
     USAGE:
-        dirstat-rs [OPTIONS] [target_dir]
+        ds [OPTIONS] [target_dir]
 
     FLAGS:
         -h, --help       Prints help information
         -V, --version    Prints version information
 
     OPTIONS:
-        -d <max_depth>          Maximum recursion depth in directory [default: 3]
+        -d <max_depth>          Maximum recursion depth in directory [default: 1]
         -m <min_percent>        Threshold that determines if entry is worth being shown. Between 0-100 % of dir size.
                                 [default: 1]
 

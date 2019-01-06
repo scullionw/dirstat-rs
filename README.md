@@ -1,5 +1,16 @@
 # dirstat-rs
 
+2X faster than du
+
+4X faster than ncdu, dutree, dua, du-dust
+
+6X faster than windirstat
+
+
+(On 4-core hyperthreaded cpu)
+
+
+
     A disk usage cli similar to windirstat
 
     USAGE:

@@ -1,5 +1,5 @@
 # dirstat-rs
-___
+
 [![Crates.io](https://img.shields.io/crates/v/dirstat-rs.svg)](https://crates.io/crates/dirstat-rs)
 
 2X faster than du

@@ -1,6 +1,6 @@
 # dirstat-rs
 
-    A toy disk usage cli similar to windirstat
+    A disk usage cli similar to windirstat
 
     USAGE:
         dirstat-rs [OPTIONS] [target_dir]

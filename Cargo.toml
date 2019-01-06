@@ -4,7 +4,7 @@ version = "0.2.0"
 authors = ["scullionw <scuw1801@usherbrooke.ca>"]
 edition = "2018"
 license = "MIT"
-description = "A toy disk usage cli similar to windirstat"
+description = "A disk usage cli similar to windirstat"
 repository = "https://github.com/scullionw/dirstat-rs"
 keywords = ["cli", "disk", "usage", "tree", "windirstat"]
 categories = ["command-line-utilities"]
@@ -17,3 +17,8 @@ pretty-bytes = "0.2.2"
 
 [profile.release]
 debug = true
+
+[[bin]]
+bench = false
+path = "src/main.rs"
+name = "ds"

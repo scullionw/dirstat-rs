@@ -88,7 +88,7 @@ impl DiskItem {
 
 #[derive(StructOpt)]
 struct Config {
-    #[structopt(short = "d", default_value = "3")]
+    #[structopt(short = "d", default_value = "1")]
     /// Maximum recursion depth in directory
     max_depth: usize,
 

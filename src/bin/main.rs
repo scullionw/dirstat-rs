@@ -6,12 +6,22 @@ use std::error::Error;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+const _SHAPES: [&str; 6] = [
+    "└─┬",
+    "└──",
+    "├──",
+    "├─┬",
+    "─┬",
+    "│",
+];
+
+
 fn main() -> Result<(), Box<Error>> {
     let config = Config::from_args();
     let current_dir = env::current_dir()?;
     let target_dir = config.target_dir.as_ref().unwrap_or(&current_dir);
     println!("\n🔧  Analysing dir: {:?}\n", target_dir);
-    let analysed = DiskItem::from_analyze(&target_dir)?;
+    let analysed = DiskItem::from_analyze(&target_dir, config.apparent)?;
     show(&analysed, &config, None, 0);
     Ok(())
 }
@@ -63,11 +73,15 @@ struct Config {
 
     #[structopt(parse(from_os_str))]
     target_dir: Option<PathBuf>,
+
+    #[structopt(short = "a")]
+    /// Activates apparent size using blocks on uniz-based systems
+    apparent: bool,
 }
 
 fn parse_percent(src: &str) -> Result<f64, Box<Error>> {
     let num = src.parse::<f64>()?;
-    if num > 0.0 && num < 100.0 {
+    if num >= 0.0 && num <= 100.0 {
         Ok(num)
     } else {
         Err("Percentage must be in range [0, 100].".into())

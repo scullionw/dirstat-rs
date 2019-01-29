@@ -15,6 +15,7 @@ colored = "1.7.0"
 structopt = "0.2.14"
 rayon = "1.0.3"
 pretty-bytes = "0.2.2"
+winapi = "0.3.6"
 
 [profile.release]
 debug = true

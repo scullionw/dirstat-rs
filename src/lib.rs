@@ -5,48 +5,38 @@ use std::fs;
 use std::fs::Metadata;
 use std::path::Path;
 
+mod ffi;
+
 pub struct DiskItem {
     pub name: OsString,
     pub disk_size: u64,
     pub children: Option<Vec<DiskItem>>,
 }
 
-
 trait ApparentSize {
-    fn size(&self, apparent: bool, path: &Path) -> u64;
+    fn size(&self, apparent: bool, path: &Path) -> Result<u64, Box<Error>>;
 }
 
 impl ApparentSize for Metadata {
     #[cfg(unix)]
-    fn size(&self, apparent: bool, _path: &Path) -> u64 {
+    fn size(&self, apparent: bool, _path: &Path) -> Result<u64, Box<Error>> {
         if apparent {
             use std::os::unix::fs::MetadataExt;
-            self.blocks() * 512
+            Ok(self.blocks() * 512)
         } else {
-            self.len()
+            Ok(self.len())
         }
     }
 
     #[cfg(windows)]
-    fn size(&self, apparent: bool, path: &Path) -> u64 {
+    fn size(&self, apparent: bool, path: &Path) -> Result<u64, Box<Error>> {
         if apparent {
-            use winapi::um::fileapi::GetCompressedFileSizeW;
-            use std::ffi::OsStr;
-            use std::iter::once;
-            use std::os::windows::ffi::OsStrExt;
-            use std::ptr::null_mut;
-            let wide: Vec<u16> = path.as_os_str().encode_wide().chain(once(0)).collect();
-            let high: *mut u32 = null_mut();
-            let low = unsafe { GetCompressedFileSizeW(wide.as_ptr(), high) };
-            let high = unsafe { *high as u64 };
-            let total= (low as u64) | (high << 32);
-            total
+            ffi::compressed_size(path)
         } else {
-            self.len()
+            Ok(self.len())
         }
     }
 }
-
 
 impl DiskItem {
     pub fn from_analyze(path: &Path, apparent: bool) -> Result<Self, Box<Error>> {
@@ -73,7 +63,7 @@ impl DiskItem {
         } else {
             Ok(DiskItem {
                 name,
-                disk_size: file_info.size(apparent, path),
+                disk_size: file_info.size(apparent, path)?,
                 children: None,
             })
         }

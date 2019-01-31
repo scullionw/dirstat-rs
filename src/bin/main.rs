@@ -15,7 +15,6 @@ const _SHAPES: [&str; 6] = [
     "│",
 ];
 
-
 fn main() -> Result<(), Box<Error>> {
     let config = Config::from_args();
     let current_dir = env::current_dir()?;

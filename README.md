@@ -1,6 +1,7 @@
 # dirstat-rs
 
 [![Crates.io](https://img.shields.io/crates/v/dirstat-rs.svg)](https://crates.io/crates/dirstat-rs)
+[![Docs.rs](https://docs.rs/dirstat-rs/badge.svg)](https://docs.rs/dirstat-rs/)
 
 2X faster than du
 
@@ -28,3 +29,21 @@
 
     ARGS:
         <target_dir>
+        
+        
+# Installation
+
+    $ cargo install dirstat-rs
+
+# Usage
+
+ 1. Current directory:
+    
+        $ ds
+    
+ 2. Specific path
+ 
+        $ ds PATH
+    
+    
+    

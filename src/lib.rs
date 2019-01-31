@@ -14,12 +14,12 @@ pub struct DiskItem {
 }
 
 trait ApparentSize {
-    fn size(&self, apparent: bool, path: &Path) -> Result<u64, Box<Error>>;
+    fn size(&self, apparent: bool, path: &Path) -> Result<u64, Box<dyn Error>>;
 }
 
 impl ApparentSize for Metadata {
     #[cfg(unix)]
-    fn size(&self, apparent: bool, _path: &Path) -> Result<u64, Box<Error>> {
+    fn size(&self, apparent: bool, _path: &Path) -> Result<u64, Box<dyn Error>> {
         if apparent {
             use std::os::unix::fs::MetadataExt;
             Ok(self.blocks() * 512)
@@ -29,7 +29,7 @@ impl ApparentSize for Metadata {
     }
 
     #[cfg(windows)]
-    fn size(&self, apparent: bool, path: &Path) -> Result<u64, Box<Error>> {
+    fn size(&self, apparent: bool, path: &Path) -> Result<u64, Box<dyn Error>> {
         if apparent {
             ffi::compressed_size(path)
         } else {
@@ -39,7 +39,11 @@ impl ApparentSize for Metadata {
 }
 
 impl DiskItem {
-    pub fn from_analyze(path: &Path, apparent: bool) -> Result<Self, Box<Error>> {
+    pub fn from_analyze(
+        path: &Path,
+        apparent: bool,
+        root_dev: u64,
+    ) -> Result<Self, Box<dyn Error>> {
         let name = path.file_name().unwrap_or(&OsStr::new(".")).to_os_string();
         let file_info = path.symlink_metadata()?;
 
@@ -50,7 +54,12 @@ impl DiskItem {
 
             let mut sub_items = sub_entries
                 .par_iter()
-                .filter_map(|entry| DiskItem::from_analyze(&entry.path(), apparent).ok())
+                .filter_map(|entry| match device_num(&entry.path()) {
+                    Ok(id) if id == root_dev => {
+                        DiskItem::from_analyze(&entry.path(), apparent, root_dev).ok()
+                    }
+                    _ => None,
+                })
                 .collect::<Vec<_>>();
 
             sub_items.sort_unstable_by_key(|di| di.disk_size);
@@ -68,4 +77,19 @@ impl DiskItem {
             })
         }
     }
+}
+
+#[cfg(unix)]
+pub fn device_num<P: AsRef<Path>>(path: P) -> std::io::Result<u64> {
+    use std::os::unix::fs::MetadataExt;
+
+    path.as_ref().metadata().map(|md| md.dev())
+}
+
+#[cfg(windows)]
+pub fn device_num<P: AsRef<Path>>(path: P) -> std::io::Result<u64> {
+    use winapi_util::{file, Handle};
+
+    let h = Handle::from_path_any(path)?;
+    file::information(h).map(|info| info.volume_serial_number())
 }

@@ -22,6 +22,9 @@ features = [
   "winerror",
 ]
 
+[target.'cfg(windows)'.dependencies.winapi-util]
+version = "0.1.2"
+
 [profile.release]
 debug = true
 

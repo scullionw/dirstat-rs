@@ -1,5 +1,5 @@
 use colored::*;
-use dirstat_rs::DiskItem;
+use dirstat_rs::{device_num, DiskItem};
 use pretty_bytes::converter::convert as pretty_bytes;
 use std::env;
 use std::error::Error;
@@ -15,12 +15,13 @@ const _SHAPES: [&str; 6] = [
     "│",
 ];
 
-fn main() -> Result<(), Box<Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::from_args();
     let current_dir = env::current_dir()?;
     let target_dir = config.target_dir.as_ref().unwrap_or(&current_dir);
+    let root_dev = device_num(&target_dir)?;
     println!("\n🔧  Analysing dir: {:?}\n", target_dir);
-    let analysed = DiskItem::from_analyze(&target_dir, config.apparent)?;
+    let analysed = DiskItem::from_analyze(&target_dir, config.apparent, root_dev)?;
     show(&analysed, &config, None, 0);
     Ok(())
 }
@@ -78,7 +79,7 @@ struct Config {
     apparent: bool,
 }
 
-fn parse_percent(src: &str) -> Result<f64, Box<Error>> {
+fn parse_percent(src: &str) -> Result<f64, Box<dyn Error>> {
     let num = src.parse::<f64>()?;
     if num >= 0.0 && num <= 100.0 {
         Ok(num)

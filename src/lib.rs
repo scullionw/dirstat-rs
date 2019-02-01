@@ -46,7 +46,7 @@ impl FileInfo {
         const FILE_ATTRIBUTE_DIRECTORY: u64 = 0x10;
 
         let h = Handle::from_path_any(path)?;
-        let md = file::information(h)?; // .map(|info| info.volume_serial_number())
+        let md = file::information(h)?;
 
         if md.file_attributes() & FILE_ATTRIBUTE_DIRECTORY != 0 {
             Ok(FileInfo::Directory {
@@ -100,7 +100,7 @@ impl DiskItem {
                     children: Some(sub_items),
                 })
             }
-            FileInfo::File { size, volume_id: _ } => Ok(DiskItem {
+            FileInfo::File { size, .. } => Ok(DiskItem {
                 name,
                 disk_size: size,
                 children: None,

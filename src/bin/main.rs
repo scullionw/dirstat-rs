@@ -19,7 +19,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::from_args();
     let current_dir = env::current_dir()?;
     let target_dir = config.target_dir.as_ref().unwrap_or(&current_dir);
-    let root_dev = device_num(&target_dir)?;
+    let file_info = target_dir.symlink_metadata()?;
+    let root_dev = device_num(file_info, &target_dir)?;
     println!("\n🔧  Analysing dir: {:?}\n", target_dir);
     let analysed = DiskItem::from_analyze(&target_dir, config.apparent, root_dev)?;
     show(&analysed, &config, None, 0);
@@ -75,7 +76,7 @@ struct Config {
     target_dir: Option<PathBuf>,
 
     #[structopt(short = "a")]
-    /// Activates apparent size using blocks on uniz-based systems
+    /// Apparent size on disk.
     apparent: bool,
 }
 

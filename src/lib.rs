@@ -54,7 +54,7 @@ impl DiskItem {
 
             let mut sub_items = sub_entries
                 .par_iter()
-                .filter_map(|entry| match device_num(&entry.path()) {
+                .filter_map(|entry| match device_num(file_info.clone(), &entry.path()) {
                     Ok(id) if id == root_dev => {
                         DiskItem::from_analyze(&entry.path(), apparent, root_dev).ok()
                     }
@@ -80,14 +80,14 @@ impl DiskItem {
 }
 
 #[cfg(unix)]
-pub fn device_num<P: AsRef<Path>>(path: P) -> std::io::Result<u64> {
+pub fn device_num<P: AsRef<Path>>(md: Metadata, _path: P) -> std::io::Result<u64> {
     use std::os::unix::fs::MetadataExt;
 
-    path.as_ref().metadata().map(|md| md.dev())
+    Ok(md.dev())
 }
 
 #[cfg(windows)]
-pub fn device_num<P: AsRef<Path>>(path: P) -> std::io::Result<u64> {
+pub fn device_num<P: AsRef<Path>>(_md: Metadata, path: P) -> std::io::Result<u64> {
     use winapi_util::{file, Handle};
 
     let h = Handle::from_path_any(path)?;

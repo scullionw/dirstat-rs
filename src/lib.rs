@@ -13,27 +13,56 @@ pub struct DiskItem {
     pub children: Option<Vec<DiskItem>>,
 }
 
-trait ApparentSize {
-    fn size(&self, apparent: bool, path: &Path) -> Result<u64, Box<dyn Error>>;
+pub enum FileInfo {
+    File { size: u64, volume_id: u64 },
+    Directory { volume_id: u64 },
 }
 
-impl ApparentSize for Metadata {
+impl FileInfo {
     #[cfg(unix)]
-    fn size(&self, apparent: bool, _path: &Path) -> Result<u64, Box<dyn Error>> {
-        if apparent {
-            use std::os::unix::fs::MetadataExt;
-            Ok(self.blocks() * 512)
+    pub fn from_path(path: &Path, apparent: bool) -> Result<Self, Box<dyn Error>> {
+        use std::os::unix::fs::MetadataExt;
+
+        let md = path.symlink_metadata()?;
+        if md.is_dir() {
+            Ok(FileInfo::Directory {
+                volume_id: md.dev(),
+            })
         } else {
-            Ok(self.len())
+            let size = if apparent {
+                md.blocks() * 512
+            } else {
+                md.len()
+            };
+            Ok(FileInfo::File {
+                size,
+                volume_id: md.dev(),
+            })
         }
     }
 
     #[cfg(windows)]
-    fn size(&self, apparent: bool, path: &Path) -> Result<u64, Box<dyn Error>> {
-        if apparent {
-            ffi::compressed_size(path)
+    pub fn from_path(path: &Path, apparent: bool) -> Result<Self, Box<dyn Error>> {
+        use winapi_util::{file, Handle};
+        const FILE_ATTRIBUTE_DIRECTORY: DWORD = 0x10;
+
+        let h = Handle::from_path_any(path)?;
+        let md = file::information(h)?; // .map(|info| info.volume_serial_number())
+
+        if md.file_attributes() & FILE_ATTRIBUTE_DIRECTORY != 0 {
+            Ok(FileInfo::Directory {
+                volume_id: md.volume_serial_number(),
+            })
         } else {
-            Ok(self.len())
+            let size = if apparent {
+                ffi::compressed_size(path)?
+            } else {
+                self.len()
+            };
+            Ok(FileInfo::File {
+                size,
+                volume_id: md.volume_serial_number(),
+            })
         }
     }
 }
@@ -45,51 +74,34 @@ impl DiskItem {
         root_dev: u64,
     ) -> Result<Self, Box<dyn Error>> {
         let name = path.file_name().unwrap_or(&OsStr::new(".")).to_os_string();
-        let file_info = path.symlink_metadata()?;
+        let file_info = FileInfo::from_path(path, apparent)?;
 
-        if file_info.is_dir() {
-            let sub_entries = fs::read_dir(path)?
-                .filter_map(Result::ok)
-                .collect::<Vec<_>>();
+        match file_info {
+            FileInfo::Directory { volume_id } => {
+                let sub_entries = fs::read_dir(path)?
+                    .filter_map(Result::ok)
+                    .collect::<Vec<_>>();
 
-            let mut sub_items = sub_entries
-                .par_iter()
-                .filter_map(|entry| match device_num(file_info.clone(), &entry.path()) {
-                    Ok(id) if id == root_dev => {
+                let mut sub_items = sub_entries
+                    .par_iter()
+                    .filter_map(|entry| {
                         DiskItem::from_analyze(&entry.path(), apparent, root_dev).ok()
-                    }
-                    _ => None,
+                    })
+                    .collect::<Vec<_>>();
+
+                sub_items.sort_unstable_by_key(|di| di.disk_size);
+
+                Ok(DiskItem {
+                    name,
+                    disk_size: sub_items.iter().map(|di| di.disk_size).sum(),
+                    children: Some(sub_items),
                 })
-                .collect::<Vec<_>>();
-
-            sub_items.sort_unstable_by_key(|di| di.disk_size);
-
-            Ok(DiskItem {
+            }
+            FileInfo::File { size, volume_id } => Ok(DiskItem {
                 name,
-                disk_size: sub_items.iter().map(|di| di.disk_size).sum(),
-                children: Some(sub_items),
-            })
-        } else {
-            Ok(DiskItem {
-                name,
-                disk_size: file_info.size(apparent, path)?,
+                disk_size: size,
                 children: None,
-            })
+            }),
         }
     }
-}
-
-#[cfg(unix)]
-pub fn device_num<P: AsRef<Path>>(md: Metadata, _path: P) -> std::io::Result<u64> {
-    use std::os::unix::fs::MetadataExt;
-
-    Ok(md.dev())
-}
-
-#[cfg(windows)]
-pub fn device_num<P: AsRef<Path>>(_md: Metadata, path: P) -> std::io::Result<u64> {
-    use winapi_util::{file, Handle};
-
-    let h = Handle::from_path_any(path)?;
-    file::information(h).map(|info| info.volume_serial_number())
 }

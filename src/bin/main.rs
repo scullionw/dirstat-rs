@@ -1,5 +1,5 @@
 use colored::*;
-use dirstat_rs::{device_num, DiskItem};
+use dirstat_rs::{DiskItem, FileInfo};
 use pretty_bytes::converter::convert as pretty_bytes;
 use std::env;
 use std::error::Error;
@@ -19,12 +19,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::from_args();
     let current_dir = env::current_dir()?;
     let target_dir = config.target_dir.as_ref().unwrap_or(&current_dir);
-    let file_info = target_dir.symlink_metadata()?;
-    let root_dev = device_num(file_info, &target_dir)?;
-    println!("\n🔧  Analysing dir: {:?}\n", target_dir);
-    let analysed = DiskItem::from_analyze(&target_dir, config.apparent, root_dev)?;
-    show(&analysed, &config, None, 0);
-    Ok(())
+    let file_info = FileInfo::from_path(&target_dir, config.apparent)?;
+
+    match file_info {
+        FileInfo::Directory { volume_id } => {
+            println!("\n🔧  Analysing dir: {:?}\n", target_dir);
+            let analysed = DiskItem::from_analyze(&target_dir, config.apparent, volume_id)?;
+            show(&analysed, &config, None, 0);
+            Ok(())
+        }
+        _ => Err(format!("{} is not a directory!", target_dir.display()).into()),
+    }
 }
 
 fn show(item: &DiskItem, conf: &Config, parent_size: Option<u64>, level: usize) {

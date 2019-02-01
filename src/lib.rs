@@ -77,6 +77,10 @@ impl DiskItem {
 
         match file_info {
             FileInfo::Directory { volume_id } => {
+                if volume_id != root_dev {
+                    return Err("Filesystem boundary crossed".into());
+                }
+
                 let sub_entries = fs::read_dir(path)?
                     .filter_map(Result::ok)
                     .collect::<Vec<_>>();
@@ -96,7 +100,7 @@ impl DiskItem {
                     children: Some(sub_items),
                 })
             }
-            FileInfo::File { size, volume_id } => Ok(DiskItem {
+            FileInfo::File { size, volume_id: _ } => Ok(DiskItem {
                 name,
                 disk_size: size,
                 children: None,

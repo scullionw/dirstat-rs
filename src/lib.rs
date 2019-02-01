@@ -2,7 +2,6 @@ use rayon::prelude::*;
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::fs;
-use std::fs::Metadata;
 use std::path::Path;
 
 mod ffi;
@@ -44,7 +43,7 @@ impl FileInfo {
     #[cfg(windows)]
     pub fn from_path(path: &Path, apparent: bool) -> Result<Self, Box<dyn Error>> {
         use winapi_util::{file, Handle};
-        const FILE_ATTRIBUTE_DIRECTORY: DWORD = 0x10;
+        const FILE_ATTRIBUTE_DIRECTORY: u64 = 0x10;
 
         let h = Handle::from_path_any(path)?;
         let md = file::information(h)?; // .map(|info| info.volume_serial_number())
@@ -57,7 +56,7 @@ impl FileInfo {
             let size = if apparent {
                 ffi::compressed_size(path)?
             } else {
-                self.len()
+                md.file_size()
             };
             Ok(FileInfo::File {
                 size,

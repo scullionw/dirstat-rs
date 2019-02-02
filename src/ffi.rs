@@ -29,7 +29,7 @@ pub fn compressed_size(path: &Path) -> Result<u64, Box<dyn Error>> {
         Ok(u64::from(low))
     } else {
         let high = unsafe { *high };
-        Ok((u64::from(low)) | (u64::from(high)) << 32)
+        Ok(u64::from(high) << 32 | u64::from(low))
     }
 }
 

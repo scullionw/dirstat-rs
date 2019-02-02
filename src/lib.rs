@@ -12,6 +12,49 @@ pub struct DiskItem {
     pub children: Option<Vec<DiskItem>>,
 }
 
+impl DiskItem {
+    pub fn from_analyze(
+        path: &Path,
+        apparent: bool,
+        root_dev: u64,
+    ) -> Result<Self, Box<dyn Error>> {
+        let name = path.file_name().unwrap_or(&OsStr::new(".")).to_os_string();
+        let file_info = FileInfo::from_path(path, apparent)?;
+
+        match file_info {
+            FileInfo::Directory { volume_id } => {
+                if volume_id != root_dev {
+                    return Err("Filesystem boundary crossed".into());
+                }
+
+                let sub_entries = fs::read_dir(path)?
+                    .filter_map(Result::ok)
+                    .collect::<Vec<_>>();
+
+                let mut sub_items = sub_entries
+                    .par_iter()
+                    .filter_map(|entry| {
+                        DiskItem::from_analyze(&entry.path(), apparent, root_dev).ok()
+                    })
+                    .collect::<Vec<_>>();
+
+                sub_items.sort_unstable_by_key(|di| di.disk_size);
+
+                Ok(DiskItem {
+                    name,
+                    disk_size: sub_items.iter().map(|di| di.disk_size).sum(),
+                    children: Some(sub_items),
+                })
+            }
+            FileInfo::File { size, .. } => Ok(DiskItem {
+                name,
+                disk_size: size,
+                children: None,
+            }),
+        }
+    }
+}
+
 pub enum FileInfo {
     File { size: u64, volume_id: u64 },
     Directory { volume_id: u64 },
@@ -62,49 +105,6 @@ impl FileInfo {
                 size,
                 volume_id: md.volume_serial_number(),
             })
-        }
-    }
-}
-
-impl DiskItem {
-    pub fn from_analyze(
-        path: &Path,
-        apparent: bool,
-        root_dev: u64,
-    ) -> Result<Self, Box<dyn Error>> {
-        let name = path.file_name().unwrap_or(&OsStr::new(".")).to_os_string();
-        let file_info = FileInfo::from_path(path, apparent)?;
-
-        match file_info {
-            FileInfo::Directory { volume_id } => {
-                if volume_id != root_dev {
-                    return Err("Filesystem boundary crossed".into());
-                }
-
-                let sub_entries = fs::read_dir(path)?
-                    .filter_map(Result::ok)
-                    .collect::<Vec<_>>();
-
-                let mut sub_items = sub_entries
-                    .par_iter()
-                    .filter_map(|entry| {
-                        DiskItem::from_analyze(&entry.path(), apparent, root_dev).ok()
-                    })
-                    .collect::<Vec<_>>();
-
-                sub_items.sort_unstable_by_key(|di| di.disk_size);
-
-                Ok(DiskItem {
-                    name,
-                    disk_size: sub_items.iter().map(|di| di.disk_size).sum(),
-                    children: Some(sub_items),
-                })
-            }
-            FileInfo::File { size, .. } => Ok(DiskItem {
-                name,
-                disk_size: size,
-                children: None,
-            }),
         }
     }
 }

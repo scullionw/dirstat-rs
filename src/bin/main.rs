@@ -31,9 +31,49 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 }
 
+fn show(item: &DiskItem, conf: &Config, info: DisplayInfo) {
+    let percent_repr = if info.level == 0 {
+        format!("{:.2}%", info.fraction).green().bold()
+    } else if info.fraction > 20.0 {
+        format!("{:.2}%", info.fraction).red().bold()
+    } else {
+        format!("{:.2}%", info.fraction).cyan()
+    };
+
+    println!(
+        "{}{} {} [{}] => {:?}",
+        info.indents,
+        if info.last { shape::LAST } else { shape::ITEM },
+        percent_repr,
+        pretty_bytes(item.disk_size as f64),
+        item.name
+    );
+    if info.level < conf.max_depth {
+        if let Some(children) = &item.children {
+            let children = children
+                .iter()
+                .map(|child| (child, size_fraction(child, item)))
+                .filter(|&(_, fraction)| fraction > conf.min_percent)
+                .collect::<Vec<_>>();
+                
+            if let Some((last_child, children)) = children.split_first() {
+                for &(child, fraction) in children.iter().rev() {
+                    show(child, conf, info.add_item(fraction));
+                }
+                let &(child, fraction) = last_child;
+                show(child, conf, info.add_last(fraction));
+            }
+        }
+    }
+}
+
+fn size_fraction(child: &DiskItem, parent: &DiskItem) -> f64 {
+    100.0 * (child.disk_size as f64 / parent.disk_size as f64)
+}
+
 #[derive(Debug, Clone)]
 struct DisplayInfo {
-    parent_size: Option<u64>,
+    fraction: f64,
     level: usize,
     last: bool,
     indents: String,
@@ -42,67 +82,30 @@ struct DisplayInfo {
 impl DisplayInfo {
     fn new() -> Self {
         Self {
-            parent_size: None,
+            fraction: 100.0,
             level: 0,
-            last: false,
+            last: true,
             indents: String::new(),
         }
     }
     // TODO: Consume or mut instead of cloning
-    fn add_item(&self, parent_size: u64) -> Self {
+    fn add_item(&self, fraction: f64) -> Self {
         let indent = if self.last { " " } else { shape::INDENT };
         Self {
-            parent_size: Some(parent_size),
+            fraction,
             level: self.level + 1,
             last: false,
             indents: self.indents.clone() + indent + "  ",
         }
     }
 
-    fn add_last(&self, parent_size: u64) -> Self {
+    fn add_last(&self, fraction: f64) -> Self {
         let indent = if self.last { " " } else { shape::INDENT };
         Self {
-            parent_size: Some(parent_size),
+            fraction,
             level: self.level + 1,
             last: true,
             indents: self.indents.clone() + indent + "  ",
-        }
-    }
-}
-
-fn show(item: &DiskItem, conf: &Config, info: DisplayInfo) {
-    let percent = match info.parent_size {
-        Some(size) => (item.disk_size as f64 / size as f64) * 100.0,
-        None => 100.0
-    };
-
-    let percent_repr = if info.level == 0 {
-        format!("{:.2}%", percent).green().bold()
-    } else if percent > 20.0 {
-        format!("{:.2}%", percent).red().bold()
-    } else {
-        format!("{:.2}%", percent).cyan()
-    };
-
-    if percent > conf.min_percent {
-        println!(
-            "{}{} {} [{}] => {:?}",
-            //padding,
-            info.indents,
-            if info.last { shape::LAST } else { shape::ITEM },
-            percent_repr,
-            pretty_bytes(item.disk_size as f64),
-            item.name
-        );
-        if info.level < conf.max_depth {
-            if let Some(disk_items) = &item.children {
-                if let Some((last_item, disk_items)) = disk_items.split_first() {
-                    for disk_item in disk_items.iter().rev() {
-                        show(disk_item, conf, info.add_item(item.disk_size))
-                    }
-                    show(last_item, conf, info.add_last(item.disk_size))
-                }
-            }
         }
     }
 }

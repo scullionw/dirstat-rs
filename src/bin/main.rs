@@ -6,14 +6,13 @@ use std::error::Error;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-const _SHAPES: [&str; 6] = [
-    "└─┬",
-    "└──",
-    "├──",
-    "├─┬",
-    "─┬",
-    "│",
-];
+mod shape {
+    pub const INDENT: &str = "│";
+    pub const _LAST_WITH_CHILDREN: &str = "└─┬";
+    pub const LAST: &str = "└──";
+    pub const ITEM: &str = "├──";
+    pub const _ITEM_WITH_CHILDREN: &str = "├─┬";
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::from_args();
@@ -25,18 +24,59 @@ fn main() -> Result<(), Box<dyn Error>> {
         FileInfo::Directory { volume_id } => {
             println!("\n🔧  Analysing dir: {:?}\n", target_dir);
             let analysed = DiskItem::from_analyze(&target_dir, config.apparent, volume_id)?;
-            show(&analysed, &config, None, 0);
+            show(&analysed, &config, DisplayInfo::new());
             Ok(())
         }
         _ => Err(format!("{} is not a directory!", target_dir.display()).into()),
     }
 }
 
-fn show(item: &DiskItem, conf: &Config, parent_size: Option<u64>, level: usize) {
-    let padding = "-".repeat(level * 3);
-    let percent = parent_size.map_or(100.0, |p_s| (item.disk_size as f64 / p_s as f64) * 100.0);
+#[derive(Debug, Clone)]
+struct DisplayInfo {
+    parent_size: Option<u64>,
+    level: usize,
+    last: bool,
+    indents: String,
+}
 
-    let percent_repr = if level == 0 {
+impl DisplayInfo {
+    fn new() -> Self {
+        Self {
+            parent_size: None,
+            level: 0,
+            last: false,
+            indents: String::new(),
+        }
+    }
+    // TODO: Consume or mut instead of cloning
+    fn add_item(&self, parent_size: u64) -> Self {
+        let indent = if self.last { " " } else { shape::INDENT };
+        Self {
+            parent_size: Some(parent_size),
+            level: self.level + 1,
+            last: false,
+            indents: self.indents.clone() + indent + "  ",
+        }
+    }
+
+    fn add_last(&self, parent_size: u64) -> Self {
+        let indent = if self.last { " " } else { shape::INDENT };
+        Self {
+            parent_size: Some(parent_size),
+            level: self.level + 1,
+            last: true,
+            indents: self.indents.clone() + indent + "  ",
+        }
+    }
+}
+
+fn show(item: &DiskItem, conf: &Config, info: DisplayInfo) {
+    let percent = match info.parent_size {
+        Some(size) => (item.disk_size as f64 / size as f64) * 100.0,
+        None => 100.0
+    };
+
+    let percent_repr = if info.level == 0 {
         format!("{:.2}%", percent).green().bold()
     } else if percent > 20.0 {
         format!("{:.2}%", percent).red().bold()
@@ -46,16 +86,21 @@ fn show(item: &DiskItem, conf: &Config, parent_size: Option<u64>, level: usize) 
 
     if percent > conf.min_percent {
         println!(
-            "{}{} [{}] => {:?}",
-            padding,
+            "{}{} {} [{}] => {:?}",
+            //padding,
+            info.indents,
+            if info.last { shape::LAST } else { shape::ITEM },
             percent_repr,
             pretty_bytes(item.disk_size as f64),
             item.name
         );
-        if level < conf.max_depth {
+        if info.level < conf.max_depth {
             if let Some(disk_items) = &item.children {
-                for disk_item in disk_items.iter().rev() {
-                    show(disk_item, conf, Some(item.disk_size), level + 1)
+                if let Some((last_item, disk_items)) = disk_items.split_first() {
+                    for disk_item in disk_items.iter().rev() {
+                        show(disk_item, conf, info.add_item(item.disk_size))
+                    }
+                    show(last_item, conf, info.add_last(item.disk_size))
                 }
             }
         }
@@ -70,7 +115,7 @@ struct Config {
 
     #[structopt(
         short = "m",
-        default_value = "1",
+        default_value = "0.1",
         parse(try_from_str = "parse_percent")
     )]
     /// Threshold that determines if entry is worth

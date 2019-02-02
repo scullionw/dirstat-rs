@@ -16,8 +16,6 @@ mod shape {
     pub const _ITEM_WITH_CHILDREN: &str = "├─┬";
 }
 
-type FastOutput<'a> = BufWriter<io::StdoutLock<'a>>;
-
 fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::from_args();
     let current_dir = env::current_dir()?;
@@ -40,7 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 }
 
-fn show(item: &DiskItem, conf: &Config, info: DisplayInfo, handle: &mut FastOutput) {
+fn show(item: &DiskItem, conf: &Config, info: DisplayInfo, handle: &mut BufWriter<io::StdoutLock>) {
     let percent_repr = if info.level == 0 {
         format!("{:.2}%", info.fraction).green().bold()
     } else if info.fraction > 20.0 {

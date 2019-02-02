@@ -1,4 +1,4 @@
-use colored::*;
+use ansi_term::Colour;
 use dirstat_rs::{DiskItem, FileInfo};
 use pretty_bytes::converter::convert as pretty_bytes;
 use std::env;
@@ -39,12 +39,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn show(item: &DiskItem, conf: &Config, info: DisplayInfo, handle: &mut BufWriter<io::StdoutLock>) {
+    let s = format!("{:.2}%", info.fraction);
     let percent_repr = if info.level == 0 {
-        format!("{:.2}%", info.fraction).green().bold()
+        Colour::Green.paint(s)
     } else if info.fraction > 20.0 {
-        format!("{:.2}%", info.fraction).red().bold()
+        Colour::Red.paint(s)
     } else {
-        format!("{:.2}%", info.fraction).cyan()
+        Colour::Cyan.paint(s)
     };
 
     writeln!(

@@ -3,6 +3,8 @@ use dirstat_rs::{DiskItem, FileInfo};
 use pretty_bytes::converter::convert as pretty_bytes;
 use std::env;
 use std::error::Error;
+use std::io::Write;
+use std::io::{self, BufWriter};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -14,24 +16,31 @@ mod shape {
     pub const _ITEM_WITH_CHILDREN: &str = "├─┬";
 }
 
+type FastOutput<'a> = BufWriter<io::StdoutLock<'a>>;
+
 fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::from_args();
     let current_dir = env::current_dir()?;
     let target_dir = config.target_dir.as_ref().unwrap_or(&current_dir);
     let file_info = FileInfo::from_path(&target_dir, config.apparent)?;
 
+    // Faster output by locking stdout and buffering writes
+    let stdout = io::stdout();
+    let handle = stdout.lock();
+    let mut handle = BufWriter::new(handle);
+
     match file_info {
         FileInfo::Directory { volume_id } => {
             println!("\n🔧  Analysing dir: {:?}\n", target_dir);
             let analysed = DiskItem::from_analyze(&target_dir, config.apparent, volume_id)?;
-            show(&analysed, &config, DisplayInfo::new());
+            show(&analysed, &config, DisplayInfo::new(), &mut handle);
             Ok(())
         }
         _ => Err(format!("{} is not a directory!", target_dir.display()).into()),
     }
 }
 
-fn show(item: &DiskItem, conf: &Config, info: DisplayInfo) {
+fn show(item: &DiskItem, conf: &Config, info: DisplayInfo, handle: &mut FastOutput) {
     let percent_repr = if info.level == 0 {
         format!("{:.2}%", info.fraction).green().bold()
     } else if info.fraction > 20.0 {
@@ -40,14 +49,17 @@ fn show(item: &DiskItem, conf: &Config, info: DisplayInfo) {
         format!("{:.2}%", info.fraction).cyan()
     };
 
-    println!(
+    writeln!(
+        handle,
         "{}{} {} [{}] => {:?}",
         info.indents,
         if info.last { shape::LAST } else { shape::ITEM },
         percent_repr,
         pretty_bytes(item.disk_size as f64),
         item.name
-    );
+    )
+    .expect("Could not write to stdout!");
+
     if info.level < conf.max_depth {
         if let Some(children) = &item.children {
             let children = children
@@ -55,13 +67,13 @@ fn show(item: &DiskItem, conf: &Config, info: DisplayInfo) {
                 .map(|child| (child, size_fraction(child, item)))
                 .filter(|&(_, fraction)| fraction > conf.min_percent)
                 .collect::<Vec<_>>();
-                
+
             if let Some((last_child, children)) = children.split_first() {
                 for &(child, fraction) in children.iter().rev() {
-                    show(child, conf, info.add_item(fraction));
+                    show(child, conf, info.add_item(fraction), handle);
                 }
                 let &(child, fraction) = last_child;
-                show(child, conf, info.add_last(fraction));
+                show(child, conf, info.add_last(fraction), handle);
             }
         }
     }

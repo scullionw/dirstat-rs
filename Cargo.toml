@@ -29,7 +29,8 @@ features = [
 ]
 
 [profile.release]
-debug = true
+lto='fat'
+codegen-units=1
 
 [[bin]]
 bench = false

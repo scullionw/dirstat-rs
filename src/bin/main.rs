@@ -1,4 +1,3 @@
-// use ansi_term::Colour;
 use atty::Stream;
 use dirstat_rs::{DiskItem, FileInfo};
 use pretty_bytes::converter::convert as pretty_bytes;
@@ -10,12 +9,15 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 use termcolor::{Buffer, BufferWriter, Color, ColorChoice, ColorSpec, WriteColor};
 
+const INDENT_COLOR: Option<Color> = Some(Color::Rgb(75, 75, 75));
+
 mod shape {
     pub const INDENT: &str = "│";
     pub const _LAST_WITH_CHILDREN: &str = "└─┬";
     pub const LAST: &str = "└──";
     pub const ITEM: &str = "├──";
     pub const _ITEM_WITH_CHILDREN: &str = "├─┬";
+    pub const SPACING: &str = "──";
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -80,19 +82,21 @@ fn show(item: &DiskItem, conf: &Config, info: DisplayInfo, buffer: &mut Buffer) 
 }
 
 fn show_item(item: &DiskItem, info: &DisplayInfo, buffer: &mut Buffer) -> io::Result<()> {
+    // Indentation
+    buffer.set_color(ColorSpec::new().set_fg(INDENT_COLOR))?;
     write!(buffer, "{}{}", info.indents, info.prefix())?;
-
-    let color = Some(info.color());
-    buffer.set_color(ColorSpec::new().set_fg(color))?;
+    // Percentage
+    buffer.set_color(ColorSpec::new().set_fg(info.color()))?;
     write!(buffer, " {} ", format!("{:.2}%", info.fraction))?;
-    buffer.reset()?; // or set to Color::white, or None?
-
-    writeln!(
-        buffer,
-        "[{}] => {}",
-        pretty_bytes(item.disk_size as f64),
-        item.name
-    )?;
+    // Disk size
+    buffer.reset()?;
+    write!(buffer, "[{}]", pretty_bytes(item.disk_size as f64),)?;
+    // Arrow
+    buffer.set_color(ColorSpec::new().set_fg(INDENT_COLOR))?;
+    write!(buffer, " {} ", shape::SPACING)?;
+    // Name
+    buffer.reset()?;
+    writeln!(buffer, "{}", item.name)?;
     Ok(())
 }
 
@@ -152,13 +156,13 @@ impl DisplayInfo {
         }
     }
 
-    fn color(&self) -> Color {
+    fn color(&self) -> Option<Color> {
         if self.level == 0 {
-            Color::Green
+            Some(Color::Green)
         } else if self.fraction > 20.0 {
-            Color::Red
+            Some(Color::Red)
         } else {
-            Color::Cyan
+            Some(Color::Cyan)
         }
     }
 }

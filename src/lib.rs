@@ -1,7 +1,7 @@
 use rayon::prelude::*;
 use serde::Serialize;
 use std::error::Error;
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
 

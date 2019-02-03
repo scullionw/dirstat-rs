@@ -1,12 +1,14 @@
-use ansi_term::Colour;
+// use ansi_term::Colour;
+use atty::Stream;
 use dirstat_rs::{DiskItem, FileInfo};
 use pretty_bytes::converter::convert as pretty_bytes;
 use std::env;
 use std::error::Error;
+use std::io;
 use std::io::Write;
-use std::io::{self, BufWriter};
 use std::path::PathBuf;
 use structopt::StructOpt;
+use termcolor::{Buffer, BufferWriter, Color, ColorChoice, ColorSpec, WriteColor};
 
 mod shape {
     pub const INDENT: &str = "│";
@@ -22,43 +24,31 @@ fn main() -> Result<(), Box<dyn Error>> {
     let target_dir = config.target_dir.as_ref().unwrap_or(&current_dir);
     let file_info = FileInfo::from_path(&target_dir, config.apparent)?;
 
-    // Faster output by locking stdout and buffering writes
-    let stdout = io::stdout();
-    let handle = stdout.lock();
-    let mut handle = BufWriter::new(handle);
+    let color_choice = if atty::is(Stream::Stdout) {
+        ColorChoice::Auto
+    } else {
+        ColorChoice::Never
+    };
+
+    let stdout = BufferWriter::stdout(color_choice);
+    let mut buffer = stdout.buffer();
 
     match file_info {
         FileInfo::Directory { volume_id } => {
             println!("\n🔧  Analysing dir: {:?}\n", target_dir);
             let analysed = DiskItem::from_analyze(&target_dir, config.apparent, volume_id)?;
-            show(&analysed, &config, DisplayInfo::new(), &mut handle);
+            show(&analysed, &config, DisplayInfo::new(), &mut buffer)?;
+            stdout.print(&buffer)?;
             Ok(())
         }
         _ => Err(format!("{} is not a directory!", target_dir.display()).into()),
     }
 }
 
-fn show(item: &DiskItem, conf: &Config, info: DisplayInfo, handle: &mut BufWriter<io::StdoutLock>) {
-    let s = format!("{:.2}%", info.fraction);
-    let percent_repr = if info.level == 0 {
-        Colour::Green.paint(s)
-    } else if info.fraction > 20.0 {
-        Colour::Red.paint(s)
-    } else {
-        Colour::Cyan.paint(s)
-    };
-
-    writeln!(
-        handle,
-        "{}{} {} [{}] => {:?}",
-        info.indents,
-        if info.last { shape::LAST } else { shape::ITEM },
-        percent_repr,
-        pretty_bytes(item.disk_size as f64),
-        item.name
-    )
-    .expect("Could not write to stdout!");
-
+fn show(item: &DiskItem, conf: &Config, info: DisplayInfo, buffer: &mut Buffer) -> io::Result<()> {
+    // Show self
+    show_item(item, &info, buffer)?;
+    // Recursively show children
     if info.level < conf.max_depth {
         if let Some(children) = &item.children {
             let children = children
@@ -69,13 +59,31 @@ fn show(item: &DiskItem, conf: &Config, info: DisplayInfo, handle: &mut BufWrite
 
             if let Some((last_child, children)) = children.split_first() {
                 for &(child, fraction) in children.iter().rev() {
-                    show(child, conf, info.add_item(fraction), handle);
+                    show(child, conf, info.add_item(fraction), buffer)?;
                 }
                 let &(child, fraction) = last_child;
-                show(child, conf, info.add_last(fraction), handle);
+                show(child, conf, info.add_last(fraction), buffer)?;
             }
         }
     }
+    Ok(())
+}
+
+fn show_item(item: &DiskItem, info: &DisplayInfo, buffer: &mut Buffer) -> io::Result<()> {
+    write!(buffer, "{}{}", info.indents, info.prefix())?;
+
+    let color = Some(info.color());
+    buffer.set_color(ColorSpec::new().set_fg(color))?;
+    write!(buffer, " {} ", format!("{:.2}%", info.fraction))?;
+    buffer.reset()?; // or set to Color::white, or None?
+
+    writeln!(
+        buffer,
+        "[{}] => {:?}",
+        pretty_bytes(item.disk_size as f64),
+        item.name
+    )?;
+    Ok(())
 }
 
 fn size_fraction(child: &DiskItem, parent: &DiskItem) -> f64 {
@@ -101,22 +109,46 @@ impl DisplayInfo {
     }
     // TODO: Consume or mut instead of cloning
     fn add_item(&self, fraction: f64) -> Self {
-        let indent = if self.last { " " } else { shape::INDENT };
         Self {
             fraction,
             level: self.level + 1,
             last: false,
-            indents: self.indents.clone() + indent + "  ",
+            indents: self.indents.clone() + self.indent() + "  ",
         }
     }
 
     fn add_last(&self, fraction: f64) -> Self {
-        let indent = if self.last { " " } else { shape::INDENT };
         Self {
             fraction,
             level: self.level + 1,
             last: true,
-            indents: self.indents.clone() + indent + "  ",
+            indents: self.indents.clone() + self.indent() + "  ",
+        }
+    }
+
+    fn indent(&self) -> &'static str {
+        if self.last {
+            " "
+        } else {
+            shape::INDENT
+        }
+    }
+
+    fn prefix(&self) -> &'static str {
+        if self.last {
+            shape::LAST
+        } else {
+            shape::ITEM
+        }
+    }
+
+    fn color(&self) -> Color {
+        if self.level == 0 {
+            Color::Green
+        } else if self.fraction > 20.0 {
+            Color::Red
+        } else {
+            Color::Cyan
         }
     }
 }

@@ -17,14 +17,14 @@ pretty-bytes = "0.2.2"
 termcolor = "1.0.4"
 atty = "0.2.11"
 
+[target.'cfg(windows)'.dependencies]
+winapi-util = "0.1.2"
+
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3.6"
 features = [
   "winerror",
 ]
-
-[target.'cfg(windows)'.dependencies.winapi-util]
-version = "0.1.2"
 
 [profile.release]
 debug = true

@@ -33,16 +33,26 @@ fn main() -> Result<(), Box<dyn Error>> {
     let stdout = BufferWriter::stdout(color_choice);
     let mut buffer = stdout.buffer();
 
-    match file_info {
+    if !config.json {
+        println!("\n🔧  Analysing dir: {}\n", target_dir.display())
+    };
+
+    let analysed = match file_info {
         FileInfo::Directory { volume_id } => {
-            println!("\n🔧  Analysing dir: {:?}\n", target_dir);
-            let analysed = DiskItem::from_analyze(&target_dir, config.apparent, volume_id)?;
-            show(&analysed, &config, DisplayInfo::new(), &mut buffer)?;
-            stdout.print(&buffer)?;
-            Ok(())
+            DiskItem::from_analyze(&target_dir, config.apparent, volume_id)?
         }
-        _ => Err(format!("{} is not a directory!", target_dir.display()).into()),
+        _ => return Err(format!("{} is not a directory!", target_dir.display()).into()),
+    };
+
+    if config.json {
+        let serialized = serde_json::to_string(&analysed)?;
+        writeln!(&mut buffer, "{}", serialized)?;
+    } else {
+        show(&analysed, &config, DisplayInfo::new(), &mut buffer)?;
     }
+
+    stdout.print(&buffer)?;
+    Ok(())
 }
 
 fn show(item: &DiskItem, conf: &Config, info: DisplayInfo, buffer: &mut Buffer) -> io::Result<()> {
@@ -57,8 +67,8 @@ fn show(item: &DiskItem, conf: &Config, info: DisplayInfo, buffer: &mut Buffer) 
                 .filter(|&(_, fraction)| fraction > conf.min_percent)
                 .collect::<Vec<_>>();
 
-            if let Some((last_child, children)) = children.split_first() {
-                for &(child, fraction) in children.iter().rev() {
+            if let Some((last_child, children)) = children.split_last() {
+                for &(child, fraction) in children.iter() {
                     show(child, conf, info.add_item(fraction), buffer)?;
                 }
                 let &(child, fraction) = last_child;
@@ -79,7 +89,7 @@ fn show_item(item: &DiskItem, info: &DisplayInfo, buffer: &mut Buffer) -> io::Re
 
     writeln!(
         buffer,
-        "[{}] => {:?}",
+        "[{}] => {}",
         pretty_bytes(item.disk_size as f64),
         item.name
     )?;
@@ -174,6 +184,10 @@ struct Config {
     #[structopt(short = "a")]
     /// Apparent size on disk.
     apparent: bool,
+
+    #[structopt(short = "j")]
+    // Output sorted json
+    json: bool,
 }
 
 fn parse_percent(src: &str) -> Result<f64, Box<dyn Error>> {

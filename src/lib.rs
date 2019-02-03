@@ -1,4 +1,5 @@
 use rayon::prelude::*;
+use serde::Serialize;
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::fs;
@@ -6,8 +7,9 @@ use std::path::Path;
 
 mod ffi;
 
+#[derive(Serialize)]
 pub struct DiskItem {
-    pub name: OsString,
+    pub name: String,
     pub disk_size: u64,
     pub children: Option<Vec<DiskItem>>,
 }
@@ -18,7 +20,12 @@ impl DiskItem {
         apparent: bool,
         root_dev: u64,
     ) -> Result<Self, Box<dyn Error>> {
-        let name = path.file_name().unwrap_or(&OsStr::new(".")).to_os_string();
+        let name = path
+            .file_name()
+            .unwrap_or(&OsStr::new("."))
+            .to_string_lossy()
+            .to_string();
+
         let file_info = FileInfo::from_path(path, apparent)?;
 
         match file_info {
@@ -38,7 +45,7 @@ impl DiskItem {
                     })
                     .collect::<Vec<_>>();
 
-                sub_items.sort_unstable_by_key(|di| di.disk_size);
+                sub_items.sort_unstable_by(|a, b| a.disk_size.cmp(&b.disk_size).reverse());
 
                 Ok(DiskItem {
                     name,

@@ -170,7 +170,7 @@ impl DisplayInfo {
 #[derive(StructOpt)]
 struct Config {
     #[structopt(short = "d", default_value = "1")]
-    /// Maximum recursion depth in directory
+    /// Maximum recursion depth in directory.
     max_depth: usize,
 
     #[structopt(
@@ -190,7 +190,7 @@ struct Config {
     apparent: bool,
 
     #[structopt(short = "j")]
-    // Output sorted json
+    /// Output sorted json.
     json: bool,
 }
 

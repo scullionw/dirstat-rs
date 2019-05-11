@@ -31,6 +31,7 @@ features = [
 [profile.release]
 lto='fat'
 codegen-units=1
+incremental = false
 
 [[bin]]
 bench = false

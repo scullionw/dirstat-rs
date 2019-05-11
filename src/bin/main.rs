@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut buffer = stdout.buffer();
 
     if !config.json {
-        println!("\n🔧  Analysing dir: {}\n", target_dir.display())
+        println!("\nAnalysing: {}\n", target_dir.display())
     };
 
     let analysed = match file_info {
@@ -50,14 +50,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         let serialized = serde_json::to_string(&analysed)?;
         writeln!(&mut buffer, "{}", serialized)?;
     } else {
-        show(&analysed, &config, DisplayInfo::new(), &mut buffer)?;
+        show(&analysed, &config, &DisplayInfo::new(), &mut buffer)?;
     }
 
     stdout.print(&buffer)?;
     Ok(())
 }
 
-fn show(item: &DiskItem, conf: &Config, info: DisplayInfo, buffer: &mut Buffer) -> io::Result<()> {
+fn show(item: &DiskItem, conf: &Config, info: &DisplayInfo, buffer: &mut Buffer) -> io::Result<()> {
     // Show self
     show_item(item, &info, buffer)?;
     // Recursively show children
@@ -71,10 +71,10 @@ fn show(item: &DiskItem, conf: &Config, info: DisplayInfo, buffer: &mut Buffer) 
 
             if let Some((last_child, children)) = children.split_last() {
                 for &(child, fraction) in children.iter() {
-                    show(child, conf, info.add_item(fraction), buffer)?;
+                    show(child, conf, &info.add_item(fraction), buffer)?;
                 }
                 let &(child, fraction) = last_child;
-                show(child, conf, info.add_last(fraction), buffer)?;
+                show(child, conf, &info.add_last(fraction), buffer)?;
             }
         }
     }

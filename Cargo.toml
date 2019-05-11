@@ -11,19 +11,19 @@ keywords = ["cli", "disk", "usage", "tree", "windirstat"]
 categories = ["command-line-utilities"]
 
 [dependencies]
-structopt = "0.2.14"
+structopt = "0.2.15"
 rayon = "1.0.3"
 pretty-bytes = "0.2.2"
 termcolor = "1.0.4"
 atty = "0.2.11"
-serde = { version = "1.0.86", features = ["derive"] }
-serde_json = "1.0.38"
+serde = { version = "1.0.91", features = ["derive"] }
+serde_json = "1.0.39"
 
 [target.'cfg(windows)'.dependencies]
 winapi-util = "0.1.2"
 
 [target.'cfg(windows)'.dependencies.winapi]
-version = "0.3.6"
+version = "0.3.7"
 features = [
   "winerror",
 ]

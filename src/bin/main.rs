@@ -20,7 +20,21 @@ mod shape {
     pub const SPACING: &str = "──";
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() {
+    if let Err(e) = dirstat() {
+        let bufwtr = BufferWriter::stderr(ColorChoice::Always);
+        let mut buffer = bufwtr.buffer();
+        buffer
+            .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
+            .unwrap();
+        writeln!(&mut buffer, "Error: {}", e).unwrap();
+        bufwtr.print(&buffer).unwrap();
+
+        std::process::exit(1);
+    }
+}
+
+fn dirstat() -> Result<(), Box<dyn Error>> {
     let config = Config::from_args();
     let current_dir = env::current_dir()?;
     let target_dir = config.target_dir.as_ref().unwrap_or(&current_dir);

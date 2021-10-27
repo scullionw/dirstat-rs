@@ -5,7 +5,6 @@ use std::io;
 use std::iter::once;
 use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
-use std::ptr::null_mut;
 use winapi::shared::winerror::NO_ERROR;
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::fileapi::GetCompressedFileSizeW;
@@ -13,10 +12,10 @@ use winapi::um::fileapi::INVALID_FILE_SIZE;
 
 pub fn compressed_size(path: &Path) -> Result<u64, Box<dyn Error>> {
     let wide: Vec<u16> = path.as_os_str().encode_wide().chain(once(0)).collect();
-    let high: *mut u32 = null_mut();
+    let mut high: u32 = 0;
 
     // TODO: Deal with max path size
-    let low = unsafe { GetCompressedFileSizeW(wide.as_ptr(), high) };
+    let low = unsafe { GetCompressedFileSizeW(wide.as_ptr(), &mut high) };
 
     if low == INVALID_FILE_SIZE {
         let err = get_last_error();
@@ -25,12 +24,7 @@ pub fn compressed_size(path: &Path) -> Result<u64, Box<dyn Error>> {
         }
     }
 
-    if high.is_null() {
-        Ok(u64::from(low))
-    } else {
-        let high = unsafe { *high };
-        Ok(u64::from(high) << 32 | u64::from(low))
-    }
+    Ok(u64::from(high) << 32 | u64::from(low))
 }
 
 fn get_last_error() -> u32 {

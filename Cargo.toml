@@ -1,6 +1,6 @@
 [package]
 name = "dirstat-rs"
-version = "0.3.4"
+version = "0.3.5"
 authors = ["scullionw <scuw1801@usherbrooke.ca>"]
 edition = "2018"
 license = "MIT"
@@ -11,26 +11,24 @@ keywords = ["cli", "disk", "usage", "tree", "windirstat"]
 categories = ["command-line-utilities"]
 
 [dependencies]
-structopt = "0.2.15"
-rayon = "1.0.3"
+structopt = "0.2.18"
+rayon = "1.5.1"
 pretty-bytes = "0.2.2"
-termcolor = "1.0.4"
-atty = "0.2.11"
-serde = { version = "1.0.91", features = ["derive"] }
-serde_json = "1.0.39"
+termcolor = "1.1.2"
+atty = "0.2.14"
+serde = { version = "1.0.131", features = ["derive"] }
+serde_json = "1.0.73"
 
 [target.'cfg(windows)'.dependencies]
 winapi-util = "0.1.2"
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3.7"
-features = [
-  "winerror",
-]
+features = ["winerror"]
 
 [profile.release]
-lto='fat'
-codegen-units=1
+lto = 'fat'
+codegen-units = 1
 incremental = false
 
 [[bin]]

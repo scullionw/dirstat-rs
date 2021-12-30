@@ -1,7 +1,12 @@
 # dirstat-rs
 
+Fast, cross-platform disk usage CLI
+
 [![Crates.io](https://img.shields.io/crates/v/dirstat-rs.svg)](https://crates.io/crates/dirstat-rs)
 [![Docs.rs](https://docs.rs/dirstat-rs/badge.svg)](https://docs.rs/dirstat-rs/)
+![Language](https://img.shields.io/badge/language-rust-orange)
+![Platforms](https://img.shields.io/badge/platforms-Windows%2C%20macOS%20and%20Linux-blue)
+![License](https://img.shields.io/github/license/scullionw/dirstat-rs)
 
 ![](demo/ds_demo.gif)
 
@@ -12,30 +17,6 @@
 6X faster than windirstat
 
 (On 4-core hyperthreaded cpu)
-
-
-    C:\Users\LUNA>ds --help
-    dirstat-rs 0.2.2
-    scullionw <scuw1801@usherbrooke.ca>
-    A disk usage cli similar to windirstat
-
-    USAGE:
-        ds [FLAGS] [OPTIONS] [target_dir]
-
-    FLAGS:
-        -a               Apparent size on disk.
-        -h, --help       Prints help information
-        -j               Output sorted json.
-        -V, --version    Prints version information
-
-    OPTIONS:
-        -d <max_depth>          Maximum recursion depth in directory. [default: 1]
-        -m <min_percent>        Threshold that determines if entry is worth being shown. Between 0-100 % of dir size.
-                                [default: 0.1]
-
-    ARGS:
-        <target_dir>
-        
         
 # Installation
 
@@ -44,18 +25,17 @@
     brew tap scullionw/tap
     brew install dirstat-rs
 
-
 ## Or if you prefer compiling yourself
 
-### from Crates.io:
+### from crates.io:
 
         cargo install dirstat-rs
         
-## or latest from git:
+### or latest from git:
 
         cargo install --git "https://github.com/scullionw/dirstat-rs"
         
-## or from source:
+### or from source:
 
         cargo build --release
         sudo chmod +x /target/release/ds
@@ -63,23 +43,23 @@
 
 # Usage
 
- 1. Current directory:
+### Current directory
     
         $ ds
     
- 2. Specific path
+### Specific path
  
         $ ds PATH
 
- 3. Choose depth
+### Choose depth
  
         $ ds -d 3
 
- 4. Show apparent size on disk
+### Show apparent size on disk
 
         $ ds -a PATH
 
- 5. Override minimum size threshold
+### Override minimum size threshold
 
         $ ds -m 0.2 PATH
 

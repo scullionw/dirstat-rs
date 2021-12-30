@@ -23,7 +23,8 @@ jobs:
 
       - uses: actions-rs/cargo@v1
         with:
-          command: build --release --target=x86_64-apple-darwin
+          command: build
+          args: --release --target=x86_64-apple-darwin
 
       - name: Create tar
         run: |

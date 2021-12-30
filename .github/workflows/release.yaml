@@ -65,3 +65,17 @@ jobs:
           asset_path: dirstat-rs-${{ steps.get_version.outputs.version }}-universal-apple-darwin.tar.gz
           asset_name: dirstat-rs-${{ steps.get_version.outputs.version }}-universal-apple-darwin.tar.gz
           asset_content_type: application/gzip
+
+      - uses: mislav/bump-homebrew-formula-action@v1
+        if: "!contains(github.ref, '-')"
+        with:
+          formula-name: dirstat-rs
+          formula-path: Formula/dirstat-rs.rb
+          homebrew-tap: scullionw/homebrew-tap
+          base-branch: main
+          download-url: https://github.com/scullionw/dirstat-rs/releases/download/${{ steps.get_version.outputs.version }}/dirstat-rs-${{ steps.get_version.outputs.version }}-universal-apple-darwin.tar.gz
+          download-sha256: ${{ steps.shasum.outputs.sha }}
+          commit-message: |
+            {{formulaName}} {{version}}
+        env:
+          COMMITTER_TOKEN: ${{ secrets.BREW_TOKEN }}

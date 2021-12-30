@@ -43,7 +43,7 @@ jobs:
       - name: Set SHA
         id: shasum
         run: |
-          echo ::set-output name=sha::"$(shasum -a 256 ./dirstat-rs.tar.gz | awk '{printf $1}')"
+          echo ::set-output name=sha::"$(shasum -a 256 ./dirstat-rs-${{ steps.get_version.outputs.version }}-universal-apple-darwin.tar.gz | awk '{printf $1}')"
 
       - name: Create Release
         id: create_release

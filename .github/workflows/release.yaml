@@ -1,0 +1,58 @@
+name: Release
+
+on: push
+# on:
+#   push:
+#     tags:
+#       - "v*"
+
+jobs:
+  release:
+    runs-on: macos-10.11
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+
+      # - uses: actions-rs/cargo@v1
+      #   with:
+      #     command: build --release --target=aarch64-apple-darwin
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build --release --target=x86_64-apple-darwin
+
+      - name: Create tar
+        run: |
+          tar -C ./target/release/x86_64-apple-darwin/ -czf dirstat-rs.tar.gz ./ds
+
+      # - name: Get version
+      #   id: get_version
+      #   run: echo ::set-output name=version::${GITHUB_REF/refs\/tags\//}
+
+      - name: Set SHA
+        id: shasum
+        run: |
+          echo ::set-output name=sha::"$(shasum -a 256 ./dirstat-rs.tar.gz | awk '{printf $1}')"
+
+      # - name: Create Release
+      #   id: create_release
+      #   uses: actions/create-release@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     tag_name: ${{ github.ref }}
+      #     release_name: Release ${{ github.ref }}
+      #     draft: false
+      #     prerelease: false
+
+      # - name: Upload Release Asset
+      #   uses: actions/upload-release-asset@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     upload_url: ${{ steps.create_release.outputs.upload_url }}
+      #     asset_path: ./target/dirstat-rs.tar.gz
+      #     asset_name: dirstat-rs.tar.gz
+      #     asset_content_type: application/gzip

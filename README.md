@@ -38,15 +38,24 @@
         
         
 # Installation
-Crates.io:
+
+## Homebrew (macOS only)
+
+    brew tap scullionw/tap
+    brew install dirstat-rs
+
+
+## Or if you prefer compiling yourself
+
+### from Crates.io:
 
         cargo install dirstat-rs
         
-or latest from git:
+## or latest from git:
 
         cargo install --git "https://github.com/scullionw/dirstat-rs"
         
-or from source:
+## or from source:
 
         cargo build --release
         sudo chmod +x /target/release/ds
@@ -68,7 +77,12 @@ or from source:
 
  4. Show apparent size on disk
 
-        $ ds PATH
+        $ ds -a PATH
+
+ 5. Override minimum size threshold
+
+        $ ds -m 0.2 PATH
+
 
 
     

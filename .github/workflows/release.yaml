@@ -17,45 +17,51 @@ jobs:
         with:
           toolchain: stable
 
-      # - uses: actions-rs/cargo@v1
-      #   with:
-      #     command: build --release --target=aarch64-apple-darwin
-
       - uses: actions-rs/cargo@v1
         with:
           command: build
           args: --release --target=x86_64-apple-darwin
 
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target=aarch64-apple-darwin
+
+      - name: Universal binary
+        run: |
+          mkdir -p target/universal-apple-darwin/release
+          lipo -create -output target/universal-apple-darwin/release/ds target/aarch64-apple-darwin/release/ds target/x86_64-apple-darwin/release/ds
+
       - name: Create tar
         run: |
-          tar -C ./target/release/x86_64-apple-darwin/ -czf dirstat-rs.tar.gz ./ds
+          tar -C ./target/universal-apple-darwin/release/ -czf dirstat-rs-VERSION-universal-apple-darwin.tar.gz ./ds
 
-      # - name: Get version
-      #   id: get_version
-      #   run: echo ::set-output name=version::${GITHUB_REF/refs\/tags\//}
+      - name: Get version
+        id: get_version
+        run: echo ::set-output name=version::${GITHUB_REF/refs\/tags\//}
 
       - name: Set SHA
         id: shasum
         run: |
           echo ::set-output name=sha::"$(shasum -a 256 ./dirstat-rs.tar.gz | awk '{printf $1}')"
 
-      # - name: Create Release
-      #   id: create_release
-      #   uses: actions/create-release@v1
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     tag_name: ${{ github.ref }}
-      #     release_name: Release ${{ github.ref }}
-      #     draft: false
-      #     prerelease: false
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
 
-      # - name: Upload Release Asset
-      #   uses: actions/upload-release-asset@v1
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     upload_url: ${{ steps.create_release.outputs.upload_url }}
-      #     asset_path: ./target/dirstat-rs.tar.gz
-      #     asset_name: dirstat-rs.tar.gz
-      #     asset_content_type: application/gzip
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./target/dirstat-rs-VERSION-universal-apple-darwin.tar.gz
+          asset_name: dirstat-rs-VERSION-universal-apple-darwin.tar.gz
+          asset_content_type: application/gzip

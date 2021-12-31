@@ -31,6 +31,11 @@ jobs:
           command: build
           args: --release --target=aarch64-apple-darwin
 
+      - uses: actions-rs/cargo@v1
+        with:
+          command: publish
+          args: --token=${{ secrets.CRATES_TOKEN }}
+
       - name: Universal binary
         run: |
           mkdir -p target/universal-apple-darwin/release

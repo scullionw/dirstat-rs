@@ -4,14 +4,15 @@ on:
     branches:
       - '**'
 
-name: Test with Code Coverage
+#name: Test with Code Coverage
+name: Unit Tests
 
 jobs:
   test:
     name: Test
     strategy:
       matrix:
-        os: [ubuntu-20.04, windows, macos-11]
+        os: [ubuntu-20.04, windows-2019, macos-11]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -33,7 +34,8 @@ jobs:
             ~/.cargo/registry/cache
 #            target
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
-      - name: Generate test result and coverage report
+#      - name: Generate test result and coverage report
+      - name: Run tests
         run: cargo test
 
 # orginal example used code coverage and tests reports, but disable it for now

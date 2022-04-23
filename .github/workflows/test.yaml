@@ -1,0 +1,45 @@
+on:
+  pull_request:
+  push:
+    branches:
+      - '**'
+
+name: Test with Code Coverage
+
+jobs:
+  test:
+    name: Test
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, windows-10, macos-11]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Cache dependencies
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-dependencies-test
+        with:
+          path: |
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
+      - name: Generate test result and coverage report
+        run: |
+          cargo test 
+
+# orginal example used code coverage and tests reports, but disable it for now
+# https://github.com/BamPeers/rust-ci-github-actions-workflow/blob/main/.github/workflows/test.yaml
+# https://dev.to/bampeers/rust-ci-with-github-actions-1ne9
+# if we would use code coverage, not sure how it should work on cross platform tests,
+# perhaps need to gather coverage files across whole matrix into single post-processing step.
+# and test results as XML requires nightly.

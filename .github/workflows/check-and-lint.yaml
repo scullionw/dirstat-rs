@@ -28,7 +28,7 @@ jobs:
             ~/.cargo/bin
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
-            target
+#            target
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
       - uses: actions-rs/cargo@v1
         with:
@@ -71,7 +71,7 @@ jobs:
             ~/.cargo/bin
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
-            target
+#            target
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
       - uses: actions-rs/clippy-check@v1
         continue-on-error: true # currently Clippy would fail. TODO fix warnings.

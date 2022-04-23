@@ -15,11 +15,25 @@ pub struct DiskItem {
 }
 
 impl DiskItem {
+    /// Analyzes provided path and returns tree structure of analyzed DiskItems
     pub fn from_analyze(
         path: &Path,
         apparent: bool,
         root_dev: u64,
     ) -> Result<Self, Box<dyn Error>> {
+        #[cfg(windows)]
+        {
+            // Solution for windows compressed files requires path to be absolute, see ffi.rs
+            // Basically it would be triggered only on top most invocation,
+            // and afterwards all path would be absolute. We do it here as it is relatively harmless
+            // but this would allow us fo it only once instead of each invocation of ffi::compressed_size
+            if apparent && !path.is_absolute() {
+                use path_absolutize::*;
+                let absolute_dir = path.absolutize()?;
+                return Self::from_analyze(absolute_dir.as_ref(), apparent, root_dev);
+            }
+        }
+
         let name = path
             .file_name()
             .unwrap_or(&OsStr::new("."))
@@ -115,3 +129,6 @@ impl FileInfo {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -12,7 +12,7 @@ jobs:
     name: Test
     strategy:
       matrix:
-        os: [ubuntu-20.04, windows-2019, macos-11]
+        os: [ubuntu-20.04] #, windows-2019, macos-11]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -33,10 +33,23 @@ jobs:
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
 #            target
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
-#      - name: Generate test result and coverage report
+          key: ${{ runner.os }}-build-v2-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
+      - name: Install cargo-suity
+        run: cargo install cargo-suity
       - name: Run tests
-        run: cargo test
+        run: cargo  suity
+      - name: Upload Unit Test Results
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: Unit Test Results (${{ matrix.os }})
+          path: ./test-results/*
+      - name: Upload test results
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        with:
+          check_name: Test Results
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          files: ./test-results/*.xml
 
 # orginal example used code coverage and tests reports, but disable it for now
 # https://github.com/BamPeers/rust-ci-github-actions-workflow/blob/main/.github/workflows/test.yaml

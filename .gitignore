@@ -80,3 +80,5 @@ $RECYCLE.BIN/
 .idea/
 
 test-data/
+
+/test-results/

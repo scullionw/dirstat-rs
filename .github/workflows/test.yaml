@@ -12,7 +12,7 @@ jobs:
     name: Test
     strategy:
       matrix:
-        os: [ubuntu-20.04] #, windows-2019, macos-11]
+        os: [ubuntu-20.04, windows-latest, macos-11]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
@@ -38,18 +38,28 @@ jobs:
         run: cargo install cargo-suity
       - name: Run tests
         run: cargo  suity
-      - name: Upload Unit Test Results
+      - name: Upload raw Unit Test results
         if: always()
         uses: actions/upload-artifact@v2
         with:
           name: Unit Test Results (${{ matrix.os }})
           path: ./test-results/*
-      - name: Upload test results
+  publish-test-results:
+    name: "Publish Unit Tests Results"
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v2
+        with:
+          path: artifacts
+
+      - name: Publish Unit Test Results
         uses: EnricoMi/publish-unit-test-result-action@v1
         with:
-          check_name: Test Results
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          files: ./test-results/*.xml
+          files: "artifacts/**/*.xml"
 
 # orginal example used code coverage and tests reports, but disable it for now
 # https://github.com/BamPeers/rust-ci-github-actions-workflow/blob/main/.github/workflows/test.yaml

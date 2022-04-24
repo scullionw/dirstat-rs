@@ -39,7 +39,6 @@ fn test_max_path() {
     let _guard = CleanUpGuard {
         path: concatcp!(TEST_DATA_DIR, LONG_PATH_DIR) as &str,
     };
-    assert_eq!(1,2);
 
     // Given
     create_dir(PATH_1_FULL);

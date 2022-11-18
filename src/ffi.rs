@@ -139,6 +139,11 @@ pub fn set_file_compression<P: AsRef<Path>>(path: P, compress: bool) -> Result<(
     let handle = Handle::from_file(File::options().write(true).read(true).open(path)?);
 
     // mut, coz WinAPI rquires mut pointer
+    // documentation states that Windows supports only LZNT1, and it is also used by DEFAULT
+    // but practical tests show that on windows-server-22 DEFAULT doesn't compress a thing.
+    // Perhaps if we were doing compression manager or wothever -- more research would be required,
+    // but for tests hardcoding LZNT1 would suffice.
+    // We don't need be as future-proof for new algorithms in new windows releases.
     let mut compression_format: USHORT = if compress {
         COMPRESSION_FORMAT_LZNT1
     } else {

@@ -124,27 +124,28 @@ fn test_files_physical_size() {
     assert_size(concatcp!(TEST_PRE_CREATED_DIR, "text1.txt"), true, 4096);
     assert_size(concatcp!(TEST_PRE_CREATED_DIR, "text2.txt"), true, 12288);
 }
-#[test]
+
 #[cfg(windows)] // isn't supported on Unix (Theoretically possible on btrfs)
-fn test_compressed_files_physical_size() {
+#[rstest]
+#[case("b23_rand_c", 24)]
+#[case("b23_zero_c", 24)]
+#[case("b512_rand_c", 512)]
+#[case("b512_zero_c", 512)]
+#[case("b4000_rand_c", 8192)]
+#[case("b4000_zero_c", 0)]
+#[case("b4096_rand_c", 8192)]
+#[case("b4096_zero_c", 0)]
+#[case("b8000_rand_c", 12288)]
+#[case("b8192_rand_c", 12288)]
+#[case("b8192_zero_c", 0)]
+#[case("rand_1000_c", 4096)]
+#[case("text1_c.txt", 4096)]
+#[case("text2_c.txt", 4096)]
+fn test_compressed_files_physical_size(#[case] file: &str, #[case] size: u64) {
     PREPARE_COMPRESSION_SAMPLES.as_ref().unwrap();
+    let file = String::from(TEST_PRE_CREATED_DIR) + file;
 
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_rand_c"), true, 24);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_zero_c"), true, 24);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b512_rand_c"), true, 512);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b512_zero_c"), true, 512);
-
-    // Unreproducible: my Win10 -- 8192; WinServer(github) -- 4096
-    //assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4000_rand_c"), true, 8192);
-    //assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4000_zero_c"), true, 0);
-    // CI assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4096_rand_c"), true, 8192);
-    // CI assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4096_zero_c"), true, 0);
-    // assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8000_rand_c"), true, 12288);
-    // assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8192_rand_c"), true, 12288);
-    // CI assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8192_zero_c"), true, 0);
-    // assert_size(concatcp!(TEST_PRE_CREATED_DIR, "rand_1000_c"), true, 4096);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "text1_c.txt"), true, 4096);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "text2_c.txt"), true, 4096);
+    assert_size(&file, true, size);
 }
 
 #[allow(non_snake_case)]

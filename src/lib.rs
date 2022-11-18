@@ -7,6 +7,9 @@ use std::path::Path;
 
 mod ffi;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Serialize)]
 pub struct DiskItem {
     pub name: String,
@@ -21,19 +24,6 @@ impl DiskItem {
         apparent: bool,
         root_dev: u64,
     ) -> Result<Self, Box<dyn Error>> {
-        #[cfg(windows)]
-        {
-            // Solution for windows compressed files requires path to be absolute, see ffi.rs
-            // Basically it would be triggered only on top most invocation,
-            // and afterwards all path would be absolute. We do it here as it is relatively harmless
-            // but this would allow us fo it only once instead of each invocation of ffi::compressed_size
-            if apparent && !path.is_absolute() {
-                use path_absolutize::*;
-                let absolute_dir = path.absolutize()?;
-                return Self::from_analyze(absolute_dir.as_ref(), apparent, root_dev);
-            }
-        }
-
         let name = path
             .file_name()
             .unwrap_or(&OsStr::new("."))
@@ -106,29 +96,36 @@ impl FileInfo {
 
     #[cfg(windows)]
     pub fn from_path(path: &Path, apparent: bool) -> Result<Self, Box<dyn Error>> {
-        use winapi_util::{file, Handle};
-        const FILE_ATTRIBUTE_DIRECTORY: u64 = 0x10;
+        use crate::ffi::get_file_information_by_handle_ex;
+        use std::convert::TryInto;
+        use winapi::um::fileapi::FILE_ID_INFO;
+        use winapi::um::fileapi::FILE_STANDARD_INFO;
+        use winapi::um::winnt::LARGE_INTEGER;
+        use winapi_util::Handle;
 
         let h = Handle::from_path_any(path)?;
-        let md = file::information(h)?;
+        let std_info: FILE_STANDARD_INFO = get_file_information_by_handle_ex(&h)?;
+        // That's unfortunate that we have to make second syscall just to know volume serial number
+        let id_info: FILE_ID_INFO = get_file_information_by_handle_ex(&h)?;
+        // If we decide to skip symlinks, we would also need FILE_ATTRIBUTE_TAG_INFO struct.
 
-        if md.file_attributes() & FILE_ATTRIBUTE_DIRECTORY != 0 {
+        if std_info.Directory != 0 {
             Ok(FileInfo::Directory {
-                volume_id: md.volume_serial_number(),
+                volume_id: id_info.VolumeSerialNumber,
             })
         } else {
-            let size = if apparent {
-                ffi::compressed_size(path)?
+            let size: LARGE_INTEGER = if apparent {
+                std_info.AllocationSize
             } else {
-                md.file_size()
+                std_info.EndOfFile
             };
+
+            let size = ffi::read_large_integer(size);
+
             Ok(FileInfo::File {
-                size,
-                volume_id: md.volume_serial_number(),
+                size: size.try_into()?, // it is i64 on windows
+                volume_id: id_info.VolumeSerialNumber,
             })
         }
     }
 }
-
-#[cfg(test)]
-mod tests;

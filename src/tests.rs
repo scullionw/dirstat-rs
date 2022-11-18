@@ -1,3 +1,6 @@
+//! Be aware that tests are run in parallel. For this reason we must be sure to use
+//! separate dirs for different cases.
+
 use crate::{DiskItem, FileInfo};
 // warn: don't remove `as &str` after macro invocation.
 // It breaks type checker in Intellij Rust IDE
@@ -33,6 +36,8 @@ tttttttttt/ttttttttttt/ttttttttttttttt/ttttttttt/tttthhh/2222222222/22222222222/
 
 const PATH_2_FULL: &str = concatcp!(TEST_DATA_DIR, LONG_PATH_DIR, PATH_2) as &str;
 
+const TEST_PRE_CREATED_DIR: &str = concatcp!(TEST_DATA_DIR, "pre-created/");
+
 #[test]
 fn test_max_path() {
     // do not rename it into `_` it would cause immediate destrucion after creation
@@ -43,8 +48,8 @@ fn test_max_path() {
     // Given
     create_dir(PATH_1_FULL);
     create_dir(PATH_2_FULL);
-    create_file(&concatcp!(PATH_1_FULL, "file.bin") as &str, 4096);
-    create_file(&concatcp!(PATH_2_FULL, "file.bin") as &str, 8192);
+    create_file(&concatcp!(PATH_1_FULL, "file.bin"), 4096);
+    create_file(&concatcp!(PATH_2_FULL, "file.bin"), 8192);
 
     // When
     let test_path = Path::new(concatcp!(TEST_DATA_DIR, LONG_PATH_DIR) as &str);
@@ -65,8 +70,84 @@ fn test_max_path() {
 }
 
 #[test]
-#[cfg(unix)] // It gives inconsistent results on windows
-fn test_file_size() {
+fn test_files_logical_size() {
+    // TODO windows explorer reports 107564. and actual sum of sizes is 107564 as well
+    // assert_size(TEST_PRE_CREATED_DIR, false, 123943);
+    assert_size(TEST_PRE_CREATED_DIR, false, 107564);
+
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_rand"), false, 23);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_zero"), false, 23);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4000_rand"), false, 4000);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4000_zero"), false, 4000);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4096_rand"), false, 4096);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4096_zero"), false, 4096);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b512_rand"), false, 512);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b512_zero"), false, 512);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8000_rand"), false, 8000);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8192_rand"), false, 8192);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8192_zero"), false, 8192);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "rand_1000"), false, 1000);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "text1.txt"), false, 2088);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "text2.txt"), false, 9048);
+}
+#[test]
+fn test_files_physical_size() {
+    // Can't test top dir, as compressed files would mess the picture
+
+    // following are windows quirks/optimisations
+    if cfg!(windows) {
+        assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_rand"), true, 24);
+        assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_zero"), true, 24);
+        assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b512_rand"), true, 512);
+        assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b512_zero"), true, 512);
+    } else {
+        // TODO this is really FS dependant. On WSL and ntfs it all would be 0. With Ext4 it would be 4096
+        // either add FS specific logic, or don't assert this. I guss second option, as otherwise tests
+        // aren't reproducible.
+
+        // assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_rand"), true, 0);
+        // assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_zero"), true, 0);
+        // assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b512_rand"), true, 0);
+        // assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b512_zero"), true, 0);
+    }
+
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4000_rand"), true, 4096);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4000_zero"), true, 4096);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4096_rand"), true, 4096);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4096_zero"), true, 4096);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8000_rand"), true, 8192);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8192_rand"), true, 8192);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8192_zero"), true, 8192);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "rand_1000"), true, 4096);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "text1.txt"), true, 4096);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "text2.txt"), true, 12288);
+}
+#[test]
+#[cfg(windows)] // isn't supported on Unix (Theoretically possible on btrfs)
+fn test_compressed_files_physical_size() {
+    prepare_files_compression().unwrap();
+
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_rand_c"), true, 24);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_zero_c"), true, 24);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b512_rand_c"), true, 512);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b512_zero_c"), true, 512);
+
+    // Unreproducible: my Win10 -- 8192; WinServer(github) -- 4096
+    //assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4000_rand_c"), true, 8192);
+    //assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4000_zero_c"), true, 0);
+    // CI assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4096_rand_c"), true, 8192);
+    // CI assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4096_zero_c"), true, 0);
+    // assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8000_rand_c"), true, 12288);
+    // assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8192_rand_c"), true, 12288);
+    // CI assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8192_zero_c"), true, 0);
+    // assert_size(concatcp!(TEST_PRE_CREATED_DIR, "rand_1000_c"), true, 4096);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "text1_c.txt"), true, 4096);
+    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "text2_c.txt"), true, 4096);
+}
+
+#[allow(non_snake_case)]
+#[test]
+fn test_file_size_8KiB() {
     const DIR: &str = concatcp!(TEST_DATA_DIR, "test_file_size/") as &str;
     // do not rename it into `_` it would cause immediate destrucion after creation
     let _guard = CleanUpGuard { path: DIR };
@@ -127,6 +208,44 @@ fn create_file(file_path: &str, size: usize) {
 
     let mut file = File::create(file_path).unwrap();
     file.write(&content).unwrap();
+}
+
+fn assert_size(file_name: &str, apparent: bool, expected_size: u64) {
+    if let FileInfo::Directory { volume_id } =
+        FileInfo::from_path(&Path::new(TEST_DATA_DIR), apparent).unwrap()
+    {
+        let result = DiskItem::from_analyze(Path::new(file_name), apparent, volume_id)
+            .expect("Shoud be able to get file size");
+
+        assert_eq!(
+            expected_size, result.disk_size,
+            "Item {:?} size doesn't match expected {}, got {}",
+            file_name, expected_size, result.disk_size
+        );
+    } else {
+        panic!("No test-data dir present");
+    }
+}
+
+#[cfg(windows)]
+fn prepare_files_compression() -> std::io::Result<()> {
+    use crate::ffi;
+
+    for file in std::fs::read_dir(Path::new(TEST_DATA_DIR))? {
+        let file = file?;
+        if file.metadata()?.is_dir() {
+            continue;
+        }
+
+        let file_name = file.file_name();
+        let file_name = file_name.as_os_str().to_string_lossy();
+
+        let compress = file_name.ends_with("_c") || file_name.ends_with("_c.txt");
+
+        ffi::set_file_compression(file.path(), compress)?;
+    }
+
+    Ok(())
 }
 
 /// Used to clean up test folder after test runs.

@@ -1,6 +1,6 @@
 [package]
 name = "dirstat-rs"
-version = "0.3.8"
+version = "0.3.9"
 authors = ["scullionw <scuw1801@usherbrooke.ca>"]
 edition = "2018"
 license = "MIT"
@@ -20,7 +20,7 @@ serde = { version = "1.0.131", features = ["derive"] }
 serde_json = "1.0.73"
 
 [dev-dependencies]
-const_format = "0.2.22"
+const_format = "0.2.23"
 
 [target.'cfg(windows)'.dependencies]
 winapi-util = "0.1.2"
@@ -28,7 +28,7 @@ path-absolutize = "3.0.12"
 
 [target.'cfg(windows)'.dependencies.winapi]
 version = "0.3.7"
-features = ["winerror"]
+features = ["winerror", "impl-default", "ioapiset", "winioctl"]
 
 [profile.release]
 lto = 'fat'

@@ -1,80 +1,165 @@
 #![cfg(windows)]
 
-use std::error::Error;
 use std::io;
-use std::iter::once;
-use std::os::windows::ffi::OsStrExt;
+use winapi::ctypes::c_void;
+use winapi::shared::minwindef::DWORD;
+use winapi::um::fileapi::FILE_ATTRIBUTE_TAG_INFO;
+use winapi::um::fileapi::FILE_COMPRESSION_INFO;
+use winapi::um::fileapi::FILE_ID_INFO;
+use winapi::um::fileapi::FILE_STANDARD_INFO;
+use winapi::um::fileapi::FILE_STORAGE_INFO;
+use winapi::um::minwinbase::FileCompressionInfo;
+use winapi::um::minwinbase::FileIdInfo;
+use winapi::um::minwinbase::FileStandardInfo;
+use winapi::um::minwinbase::FileStorageInfo;
+use winapi::um::minwinbase::FILE_INFO_BY_HANDLE_CLASS;
+use winapi::um::winbase::GetFileInformationByHandleEx;
+use winapi_util::AsHandleRef;
+use winapi_util::Handle;
+
+#[cfg(test)]
 use std::path::Path;
-use winapi::shared::winerror::NO_ERROR;
-use winapi::um::errhandlingapi::GetLastError;
-use winapi::um::fileapi::GetCompressedFileSizeW;
-use winapi::um::fileapi::INVALID_FILE_SIZE;
 
-pub fn compressed_size(path: &Path) -> Result<u64, Box<dyn Error>> {
-    let wide = path_to_u16s(path);
-    let mut high: u32 = 0;
+/// Provides mapping from structs of file information to corresponding [FILE_INFO_BY_HANDLE_CLASS](winapi::um::minwinbase::FILE_INFO_BY_HANDLE_CLASS) constant[^info_class].
+///
+///
+/// List of supported classes supported by Windows can be found on
+/// [MSDN](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getfileinformationbyhandleex#remarks)
+///
+/// Be aware that classes with name in format `**RestartInfo` are paired with same name wituhout Restart info,
+/// and are intended to be used with enumeration logic. They won't be covered by THIS trait as they require special handling,
+/// and such structs has unknown size. They potentially can be used in future versions to speedup size calculation as they
+/// can be used to accuire list of files+their sizes in single call with directorie's HANDLE.
+///
+/// This instances should be used with [get_file_information_by_handle_ex] function
+///
+/// [^info_class]: See: [FILE_INFO_BY_HANDLE_CLASS enumeration on MSDN](https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ne-minwinbase-file_info_by_handle_class)
+pub trait FileInfoTrait: Default + Sized {
+    const CLASS: FILE_INFO_BY_HANDLE_CLASS;
+}
 
-    // TODO: Deal with max path size
-    let low = unsafe { GetCompressedFileSizeW(wide.as_ptr(), &mut high) };
+impl FileInfoTrait for FILE_STANDARD_INFO {
+    const CLASS: FILE_INFO_BY_HANDLE_CLASS = FileStandardInfo;
+}
 
-    if low == INVALID_FILE_SIZE {
-        let err = get_last_error();
-        if err != NO_ERROR {
-            return Err(io::Error::last_os_error().into());
+impl FileInfoTrait for FILE_COMPRESSION_INFO {
+    const CLASS: FILE_INFO_BY_HANDLE_CLASS = FileCompressionInfo;
+}
+
+impl FileInfoTrait for FILE_STORAGE_INFO {
+    const CLASS: FILE_INFO_BY_HANDLE_CLASS = FileStorageInfo;
+}
+
+impl FileInfoTrait for FILE_ID_INFO {
+    const CLASS: FILE_INFO_BY_HANDLE_CLASS = FileIdInfo;
+}
+
+/// If we decide not following symlinks, we would need this, and FILE_ATTRIBUTE_REPARSE_POINT
+impl FileInfoTrait for FILE_ATTRIBUTE_TAG_INFO {
+    const CLASS: FILE_INFO_BY_HANDLE_CLASS = FileIdInfo;
+}
+
+// https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntquerydirectoryfile
+// https://www.winehq.org/pipermail/wine-cvs/2015-May/106715.html
+// https://github.com/MicrosoftDocs/sdk-api/blob/docs/sdk-api-src/content/minwinbase/ne-minwinbase-file_info_by_handle_class.md#-field-fileidbothdirectoryinfo
+
+/// Gets file information by handle.
+/// It can be various types of information.
+///
+/// List of supported types by Windows OS at time of writing is:
+/// * FILE_BASIC_INFO
+/// * FILE_STANDARD_INFO
+/// * FILE_NAME_INFO
+/// * FILE_STREAM_INFO -- most likely won't work as expected, as this is also expecting to return
+/// array of unsized structs. But this particular one don't support integrating,
+/// and we need to provide whole size upfront. If we want to use this, we would need to try with
+/// particular buffer size, and if it's not enough -- reallocate buffer and try again.
+/// * FILE_COMPRESSION_INFO
+/// * FILE_ATTRIBUTE_TAG_INFO
+/// * FILE_ID_BOTH_DIR_INFO -- not supported by this function.
+/// * FILE_REMOTE_PROTOCOL_INFO
+/// * FILE_FULL_DIR_INFO -- not supported by this function.
+/// * FILE_STORAGE_INFO
+/// * FILE_ALIGNMENT_INFO
+/// * FILE_ID_INFO
+/// * FILE_ID_EXTD_DIR_INFO -- not supported by this function.
+///
+/// To use this structs you should implement [FileInfoTrait] for them.
+/// It's not supported for types with "not supported" remark, and this function should not be used for them.
+///
+/// This method is responsible for calling [GetFileInformationByHandleEx](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getfileinformationbyhandleex) function.
+///
+pub fn get_file_information_by_handle_ex<T: FileInfoTrait>(
+    handle: &Handle,
+) -> Result<T, io::Error> {
+    let mut buf = T::default();
+
+    let res = unsafe {
+        GetFileInformationByHandleEx(
+            handle.as_raw(),
+            T::CLASS,
+            &mut buf as *mut _ as *mut c_void,
+            std::mem::size_of_val(&buf) as DWORD,
+        )
+    };
+
+    if res != 0 {
+        Result::Ok(buf)
+    } else {
+        Result::Err(io::Error::last_os_error())
+    }
+}
+
+/// Extracts rust-native long value from Windows LARGE_INTEGER union.
+///
+/// That union is basically way to get access to Low-word and High-word of i64.
+/// Most likely for compatibility with win16. It was checked to work with Rust on 32bit target (i686).
+pub fn read_large_integer(size: winapi::um::winnt::LARGE_INTEGER) -> i64 {
+    // SAFETY: this is marked as unsafe, because it is access to union fields. But this particular union consists of just integer numbers
+    // of different sizes, so any bit pattern is valid.
+    let size = *unsafe { size.QuadPart() };
+    size
+}
+
+/// Sets file's special attribute "Compressed" to on or off.
+#[cfg(test)]
+pub fn set_file_compression<P: AsRef<Path>>(path: P, compress: bool) -> Result<(), io::Error> {
+    use std::fs::File;
+    use std::ptr::null_mut;
+
+    use winapi::um::ioapiset::DeviceIoControl;
+    use winapi::um::winioctl::FSCTL_SET_COMPRESSION;
+    use winapi::{
+        shared::minwindef::{LPVOID, USHORT},
+        um::winnt::{COMPRESSION_FORMAT_DEFAULT, COMPRESSION_FORMAT_NONE},
+    };
+
+    // see documentation at https://learn.microsoft.com/en-us/previous-versions/windows/embedded/ms890601(v=msdn.10)
+    // and https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ni-winioctl-fsctl_set_compression
+    let handle = Handle::from_file(File::options().write(true).read(true).open(path)?);
+
+    // mut, coz WinAPI rquires mut pointer
+    let mut compression_format: USHORT = if compress {
+        COMPRESSION_FORMAT_DEFAULT
+    } else {
+        COMPRESSION_FORMAT_NONE
+    };
+
+    unsafe {
+        let res = DeviceIoControl(
+            handle.as_raw(),
+            FSCTL_SET_COMPRESSION,
+            &mut compression_format as *mut _ as LPVOID,
+            std::mem::size_of_val(&compression_format) as u32,
+            null_mut(),
+            0,
+            null_mut(),
+            null_mut(),
+        );
+        if res != 0 {
+            Ok(())
+        } else {
+            Result::Err(io::Error::last_os_error())
         }
     }
-
-    Ok(u64::from(high) << 32 | u64::from(low))
-}
-
-/// inspired by [fn maybe_verbatim(path: &Path)](https://github.com/rust-lang/rust/blob/1f4681ad7a132755452c32a987ad0f0d075aa6aa/library/std/src/sys/windows/path.rs#L170)
-/// But function from std is calling winapi GetFullPathNameW in case if path is longer than 248.
-/// We are more optimistic and expect all path being absolute, so no API calls from this function.
-fn path_to_u16s(path: &Path) -> Vec<u16> {
-    // Normally the MAX_PATH is 260 UTF-16 code units (including the NULL).
-    // However, for APIs such as CreateDirectory[1], the limit is 248.
-    //
-    // [1]: https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createdirectorya#parameters
-    const LEGACY_MAX_PATH: usize = 248;
-    // UTF-16 encoded code points, used in parsing and building UTF-16 paths.
-    // All of these are in the ASCII range so they can be cast directly to `u16`.
-    const SEP: u16 = b'\\' as _;
-    const QUERY: u16 = b'?' as _;
-    const U: u16 = b'U' as _;
-    const N: u16 = b'N' as _;
-    const C: u16 = b'C' as _;
-    // \\?\
-    const VERBATIM_PREFIX: &[u16] = &[SEP, SEP, QUERY, SEP];
-    // \??\
-    const NT_PREFIX: &[u16] = &[SEP, QUERY, QUERY, SEP];
-    // \\?\UNC\
-    const UNC_PREFIX: &[u16] = &[SEP, SEP, QUERY, SEP, U, N, C, SEP];
-    // \\
-    const NETWORK_PREFIX: &[u16] = &[SEP, SEP];
-
-    let wide: Vec<u16> = path.as_os_str().encode_wide().chain(once(0)).collect();
-    // don't need to do anything if path is small enaught.
-    if wide.len() < LEGACY_MAX_PATH {
-        return wide;
-    }
-
-    if wide.starts_with(VERBATIM_PREFIX) || wide.starts_with(NT_PREFIX) {
-        return wide;
-    }
-
-    if wide.starts_with(NETWORK_PREFIX) {
-        // network path from SMB
-        let mut tmp = Vec::from(UNC_PREFIX);
-        tmp.extend(&wide[2..]);
-        return tmp;
-    } else {
-        // if we came here, we aren't using network drive, so just prepend File namespace prefix
-        let mut tmp = Vec::from(VERBATIM_PREFIX);
-        tmp.extend(wide);
-        return tmp;
-    }
-}
-
-fn get_last_error() -> u32 {
-    unsafe { GetLastError() }
 }

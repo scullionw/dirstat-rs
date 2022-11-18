@@ -11,18 +11,25 @@ jobs:
   test:
     name: Test
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-20.04, windows-latest, macos-11]
+        arch: [x86_64]
+        include:
+          # for windows also test 32-bit binaries,
+          # to be sure that win-api integration is correct.
+          - os: windows-latest
+            arch: i686
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: stable-${{ matrix.arch }}
           override: true
       - name: Cache dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         env:
           cache-name: cache-dependencies-test
         with:
@@ -33,7 +40,7 @@ jobs:
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
 #            target
-          key: ${{ runner.os }}-build-v2-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-${{ matrix.arch }}-build-v2-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
       - name: Install cargo-suity
         run: cargo install cargo-suity
       - name: Run tests

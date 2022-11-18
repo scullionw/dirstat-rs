@@ -5,6 +5,8 @@ use crate::{DiskItem, FileInfo};
 // warn: don't remove `as &str` after macro invocation.
 // It breaks type checker in Intellij Rust IDE
 use const_format::concatcp;
+use once_cell::sync::Lazy;
+use rstest::*;
 use std::fs::File;
 use std::io::Write;
 use std::panic;
@@ -69,27 +71,27 @@ fn test_max_path() {
     }
 }
 
-#[test]
-fn test_files_logical_size() {
-    // TODO windows explorer reports 107564. and actual sum of sizes is 107564 as well
-    // assert_size(TEST_PRE_CREATED_DIR, false, 123943);
-    assert_size(TEST_PRE_CREATED_DIR, false, 107564);
-
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_rand"), false, 23);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_zero"), false, 23);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4000_rand"), false, 4000);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4000_zero"), false, 4000);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4096_rand"), false, 4096);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4096_zero"), false, 4096);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b512_rand"), false, 512);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b512_zero"), false, 512);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8000_rand"), false, 8000);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8192_rand"), false, 8192);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8192_zero"), false, 8192);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "rand_1000"), false, 1000);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "text1.txt"), false, 2088);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "text2.txt"), false, 9048);
+#[rstest]
+#[case("", 107564)]
+#[case("b23_rand", 23)]
+#[case("b23_zero", 23)]
+#[case("b4000_rand", 4000)]
+#[case("b4000_zero", 4000)]
+#[case("b4096_rand", 4096)]
+#[case("b4096_zero", 4096)]
+#[case("b512_rand", 512)]
+#[case("b512_zero", 512)]
+#[case("b8000_rand", 8000)]
+#[case("b8192_rand", 8192)]
+#[case("b8192_zero", 8192)]
+#[case("rand_1000", 1000)]
+#[case("text1.txt", 2088)]
+#[case("text2.txt", 9048)]
+fn test_files_logical_size(#[case] file: &str, #[case] size: u64) {
+    let file = String::from(TEST_PRE_CREATED_DIR) + file;
+    assert_size(&file, false, size);
 }
+
 #[test]
 fn test_files_physical_size() {
     // Can't test top dir, as compressed files would mess the picture
@@ -125,7 +127,7 @@ fn test_files_physical_size() {
 #[test]
 #[cfg(windows)] // isn't supported on Unix (Theoretically possible on btrfs)
 fn test_compressed_files_physical_size() {
-    prepare_files_compression().unwrap();
+    PREPARE_COMPRESSION_SAMPLES.as_ref().unwrap();
 
     assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_rand_c"), true, 24);
     assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_zero_c"), true, 24);
@@ -228,10 +230,14 @@ fn assert_size(file_name: &str, apparent: bool, expected_size: u64) {
 }
 
 #[cfg(windows)]
+static PREPARE_COMPRESSION_SAMPLES: Lazy<std::io::Result<()>> =
+    Lazy::new(prepare_files_compression);
+
+#[cfg(windows)]
 fn prepare_files_compression() -> std::io::Result<()> {
     use crate::ffi;
 
-    for file in std::fs::read_dir(Path::new(TEST_DATA_DIR))? {
+    for file in std::fs::read_dir(Path::new(TEST_PRE_CREATED_DIR))? {
         let file = file?;
         if file.metadata()?.is_dir() {
             continue;

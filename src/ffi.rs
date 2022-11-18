@@ -131,7 +131,7 @@ pub fn set_file_compression<P: AsRef<Path>>(path: P, compress: bool) -> Result<(
     use winapi::um::winioctl::FSCTL_SET_COMPRESSION;
     use winapi::{
         shared::minwindef::{LPVOID, USHORT},
-        um::winnt::{COMPRESSION_FORMAT_DEFAULT, COMPRESSION_FORMAT_NONE},
+        um::winnt::{COMPRESSION_FORMAT_LZNT1, COMPRESSION_FORMAT_NONE},
     };
 
     // see documentation at https://learn.microsoft.com/en-us/previous-versions/windows/embedded/ms890601(v=msdn.10)
@@ -140,7 +140,7 @@ pub fn set_file_compression<P: AsRef<Path>>(path: P, compress: bool) -> Result<(
 
     // mut, coz WinAPI rquires mut pointer
     let mut compression_format: USHORT = if compress {
-        COMPRESSION_FORMAT_DEFAULT
+        COMPRESSION_FORMAT_LZNT1
     } else {
         COMPRESSION_FORMAT_NONE
     };

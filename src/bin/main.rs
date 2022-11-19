@@ -187,6 +187,8 @@ struct Config {
 
     #[structopt(short = "a")]
     /// Apparent size on disk.
+    ///
+    /// This would actually retrieve allocation size of files (AKA physical size on disk)
     apparent: bool,
 
     #[structopt(short = "j")]

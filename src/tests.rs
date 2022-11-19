@@ -5,6 +5,7 @@ use crate::{DiskItem, FileInfo};
 // warn: don't remove `as &str` after macro invocation.
 // It breaks type checker in Intellij Rust IDE
 use const_format::concatcp;
+#[cfg(windows)]
 use once_cell::sync::Lazy;
 use rstest::*;
 use std::fs::File;
@@ -92,37 +93,32 @@ fn test_files_logical_size(#[case] file: &str, #[case] size: u64) {
     assert_size(&file, false, size);
 }
 
-#[test]
-fn test_files_physical_size() {
-    // Can't test top dir, as compressed files would mess the picture
-
-    // following are windows quirks/optimisations
-    if cfg!(windows) {
-        assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_rand"), true, 24);
-        assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_zero"), true, 24);
-        assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b512_rand"), true, 512);
-        assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b512_zero"), true, 512);
-    } else {
-        // TODO this is really FS dependant. On WSL and ntfs it all would be 0. With Ext4 it would be 4096
-        // either add FS specific logic, or don't assert this. I guss second option, as otherwise tests
-        // aren't reproducible.
-
-        // assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_rand"), true, 0);
-        // assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b23_zero"), true, 0);
-        // assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b512_rand"), true, 0);
-        // assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b512_zero"), true, 0);
-    }
-
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4000_rand"), true, 4096);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4000_zero"), true, 4096);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4096_rand"), true, 4096);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b4096_zero"), true, 4096);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8000_rand"), true, 8192);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8192_rand"), true, 8192);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "b8192_zero"), true, 8192);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "rand_1000"), true, 4096);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "text1.txt"), true, 4096);
-    assert_size(concatcp!(TEST_PRE_CREATED_DIR, "text2.txt"), true, 12288);
+#[rstest]
+// Can't test top dir, as compressed files would mess the picture so no test for ""
+#[cfg_attr(windows, case("b23_rand", 24))]
+#[cfg_attr(windows, case("b23_zero", 24))]
+#[cfg_attr(windows, case("b512_rand", 512))]
+#[cfg_attr(windows, case("b512_zero", 512))]
+// TODO this is really FS dependant. On WSL and ntfs it all would be 0. With Ext4 it would be 4096
+// either add FS specific logic, or don't assert this. I guss second option, as otherwise tests
+// aren't reproducible.
+// #[cfg_attr(not(windows),case("b23_rand", 0))]
+// #[cfg_attr(not(windows),case("b23_zero", 0))]
+// #[cfg_attr(not(windows),case("b512_rand", 0))]
+// #[cfg_attr(not(windows),case("b512_zero", 0))]
+#[case("b4000_rand", 4096)]
+#[case("b4000_zero", 4096)]
+#[case("b4096_rand", 4096)]
+#[case("b4096_zero", 4096)]
+#[case("b8000_rand", 8192)]
+#[case("b8192_rand", 8192)]
+#[case("b8192_zero", 8192)]
+#[case("rand_1000", 4096)]
+#[case("text1.txt", 4096)]
+#[case("text2.txt", 12288)]
+fn test_files_physical_size(#[case] file: &str, #[case] size: u64) {
+    let file = String::from(TEST_PRE_CREATED_DIR) + file;
+    assert_size(&file, true, size);
 }
 
 #[cfg(windows)] // isn't supported on Unix (Theoretically possible on btrfs)

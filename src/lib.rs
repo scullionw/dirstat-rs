@@ -7,6 +7,9 @@ use std::path::Path;
 
 mod ffi;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Serialize)]
 pub struct DiskItem {
     pub name: String,

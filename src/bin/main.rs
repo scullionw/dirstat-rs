@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut buffer = stdout.buffer();
 
     if !config.json {
-        println!("\nAnalysing: {}\n", target_dir.display())
+        println!("\nAnalyzing: {}\n", target_dir.display())
     };
 
     let analysed = match file_info {
@@ -187,6 +187,8 @@ struct Config {
 
     #[structopt(short = "a")]
     /// Apparent size on disk.
+    ///
+    /// This would actually retrieve allocation size of files (AKA physical size on disk)
     apparent: bool,
 
     #[structopt(short = "j")]

@@ -12,15 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
       - name: Cache dependencies
         uses: actions/cache@v3
         env:
-          cache-name: cache-dependencies
+          cache-name: cache-check
         with:
           path: |
             ~/.cargo/.crates.toml
@@ -30,52 +25,44 @@ jobs:
             ~/.cargo/registry/cache
 #            target
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
+      - name: cargo check
+        run: cargo check
 
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - run: rustup component add rustfmt
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      - name: Install rustfmt
+        run: rustup component add rustfmt
+      - name: Run Rustfmt
+        run: cargo fmt --all -- --check
 
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: clippy
-          override: true
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-dependencies
-        with:
-          path: |
-            ~/.cargo/.crates.toml
-            ~/.cargo/.crates2.json
-            ~/.cargo/bin
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-#            target
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
-      - uses: actions-rs/clippy-check@v1
-        continue-on-error: true # currently Clippy would fail. TODO fix warnings.
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
-          name: Clippy Output
+# TODO clippy action is deprecated. Perhaps use https://github.com/actions-rs/clippy-check but it require more work
+#  clippy:
+#    name: Clippy
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v3
+#      - uses: dtolnay/rust-toolchain@stable
+#        with:
+#          components: clippy
+#      - name: Cache dependencies
+#        uses: actions/cache@v3
+#        env:
+#          cache-name: cache-dependencies
+#        with:
+#          path: |
+#            ~/.cargo/.crates.toml
+#            ~/.cargo/.crates2.json
+#            ~/.cargo/bin
+#            ~/.cargo/registry/index
+#            ~/.cargo/registry/cache
+##            target
+#          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
+#      - uses: actions-rs/clippy-check@v1
+#        continue-on-error: true # currently Clippy would fail. TODO fix warnings.
+#        with:
+#          token: ${{ secrets.GITHUB_TOKEN }}
+#          args: --all-features
+#          name: Clippy Output

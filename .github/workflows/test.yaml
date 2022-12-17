@@ -23,11 +23,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable-${{ matrix.arch }}
-          override: true
+      - name: Install toolchain
+        run: rustup install stable-${{ matrix.arch }} --profile minimal --no-self-update
+        # needed for windows test, as we are using multiple architectures here
+      - name: Switch toolchain
+        run: rustup default stable-${{ matrix.arch }}
       - name: Cache dependencies
         uses: actions/cache@v3
         env:
@@ -44,7 +44,7 @@ jobs:
       - name: Install cargo-suity
         run: cargo install cargo-suity
       - name: Run tests
-        run: cargo  suity
+        run: cargo suity
       - name: Upload raw Unit Test results
         if: always()
         uses: actions/upload-artifact@v3
@@ -64,6 +64,9 @@ jobs:
           path: artifacts
 
       - name: Publish Unit Test Results
+        # TODO this won't work for PRs from contributors,
+        # see: https://github.com/EnricoMi/publish-unit-test-result-action/blob/v1.20/README.md#support-fork-repositories-and-dependabot-branches
+        # and https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
         uses: EnricoMi/publish-unit-test-result-action@v1
         with:
           files: "artifacts/**/*.xml"

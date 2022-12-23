@@ -39,37 +39,10 @@ jobs:
             ~/.cargo/bin
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
-#            target
+#            target   <-- this can spead up CI a lot, but could lead to cache to grow indefinitely
           key: ${{ runner.os }}-${{ matrix.arch }}-build-v2-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
-      - name: Install cargo-suity
-        run: cargo install cargo-suity
       - name: Run tests
-        run: cargo suity
-      - name: Upload raw Unit Test results
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: Unit Test Results (${{ matrix.os }})
-          path: ./test-results/*
-  publish-test-results:
-    name: "Publish Unit Tests Results"
-    needs: test
-    runs-on: ubuntu-latest
-    if: always()
-
-    steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v3
-        with:
-          path: artifacts
-
-      - name: Publish Unit Test Results
-        # TODO this won't work for PRs from contributors,
-        # see: https://github.com/EnricoMi/publish-unit-test-result-action/blob/v1.20/README.md#support-fork-repositories-and-dependabot-branches
-        # and https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
-        uses: EnricoMi/publish-unit-test-result-action@v1
-        with:
-          files: "artifacts/**/*.xml"
+        run: cargo test
 
 # orginal example used code coverage and tests reports, but disable it for now
 # https://github.com/BamPeers/rust-ci-github-actions-workflow/blob/main/.github/workflows/test.yaml

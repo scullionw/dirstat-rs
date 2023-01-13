@@ -75,3 +75,11 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.gitignore.io/api/linux,macos,windows
+
+# Jetrbrains IDE (Intellij RUST/Clion/Idea)
+.idea/
+
+test-data/
+
+/test-results/
+/.vscode/

@@ -1,0 +1,76 @@
+on:
+  pull_request:
+  push:
+    branches:
+      - '**'
+
+#name: Test with Code Coverage
+name: Unit Tests
+
+jobs:
+  test:
+    name: Test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-20.04, windows-latest, macos-11]
+        arch: [x86_64]
+        include:
+          # for windows also test 32-bit binaries,
+          # to be sure that win-api integration is correct.
+          - os: windows-latest
+            arch: i686
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable-${{ matrix.arch }}
+          override: true
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-dependencies-test
+        with:
+          path: |
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+#            target
+          key: ${{ runner.os }}-${{ matrix.arch }}-build-v2-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
+      - name: Install cargo-suity
+        run: cargo install cargo-suity
+      - name: Run tests
+        run: cargo  suity
+      - name: Upload raw Unit Test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: Unit Test Results (${{ matrix.os }})
+          path: ./test-results/*
+  publish-test-results:
+    name: "Publish Unit Tests Results"
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        with:
+          files: "artifacts/**/*.xml"
+
+# orginal example used code coverage and tests reports, but disable it for now
+# https://github.com/BamPeers/rust-ci-github-actions-workflow/blob/main/.github/workflows/test.yaml
+# https://dev.to/bampeers/rust-ci-with-github-actions-1ne9
+# if we would use code coverage, not sure how it should work on cross platform tests,
+# perhaps need to gather coverage files across whole matrix into single post-processing step.
+# and test results as XML requires nightly.

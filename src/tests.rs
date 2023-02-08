@@ -3,8 +3,6 @@
 #![allow(dead_code)]
 
 use crate::{DiskItem, FileInfo};
-// warn: don't remove `as &str` after macro invocation.
-// It breaks type checker in Intellij Rust IDE
 use const_format::concatcp;
 use rstest::*;
 use std::fs::File;
@@ -29,7 +27,7 @@ tttttttttt/ttttttttttt/ttttttttttttttt/ttttttttt/tttthhh/2222222222/22222222222/
 77777777/7777777777/7777777777777/77777777777/7777777777/77777777/7777777/77777777/8888888888/\
 99999999/999999/99999999/99999999999/99999999/999999999/9999999999/";
 
-const PATH_1_FULL: &str = concatcp!(TEST_DATA_DIR, LONG_PATH_DIR, PATH_1) as &str;
+const PATH_1_FULL: &str = concatcp!(TEST_DATA_DIR, LONG_PATH_DIR, PATH_1);
 //noinspection SpellCheckingInspection
 const PATH_2: &str = "lll2/llllllll/llllllllllllllll/llllllllllllll/lllllllllllll/oooooo\
 oooooooo/oooooooooooooooo/nnnnnnnnn/nnnnnnnnnn/nnnnnnnn/nnnnnn/gggggggggg/p/a/tttt\
@@ -39,7 +37,7 @@ tttttttttt/ttttttttttt/ttttttttttttttt/ttttttttt/tttthhh/2222222222/22222222222/
 77777777/7777777777/7777777777777/77777777777/7777777777/77777777/7777777/77777777/8888888888/\
 99999999/999999/99999999/99999999999/99999999/999999999/9999999999/";
 
-const PATH_2_FULL: &str = concatcp!(TEST_DATA_DIR, LONG_PATH_DIR, PATH_2) as &str;
+const PATH_2_FULL: &str = concatcp!(TEST_DATA_DIR, LONG_PATH_DIR, PATH_2);
 
 const TEST_PRE_CREATED_DIR: &str = concatcp!(TEST_DATA_DIR, "pre-created/");
 
@@ -48,7 +46,7 @@ const TEST_PRE_CREATED_DIR: &str = concatcp!(TEST_DATA_DIR, "pre-created/");
 fn test_max_path() {
     // do not rename it into `_` it would cause immediate destruction after creation
     let _guard = CleanUpGuard {
-        path: concatcp!(TEST_DATA_DIR, LONG_PATH_DIR) as &str,
+        path: concatcp!(TEST_DATA_DIR, LONG_PATH_DIR),
     };
 
     // Given
@@ -58,11 +56,11 @@ fn test_max_path() {
     create_file(&concatcp!(PATH_2_FULL, "file.bin"), 8192);
 
     // When
-    let test_path = Path::new(concatcp!(TEST_DATA_DIR, LONG_PATH_DIR) as &str);
+    let test_path = Path::new(concatcp!(TEST_DATA_DIR, LONG_PATH_DIR));
     let result = FileInfo::from_path(test_path, true);
 
     // Then
-    if let Result::Ok(FileInfo::Directory { volume_id }) = result {
+    if let Ok(FileInfo::Directory { volume_id }) = result {
         let result = DiskItem::from_analyze(test_path, true, volume_id);
         let result = result.expect("Must collect data");
         assert_eq!(result.disk_size, 4096 + 8192);
@@ -127,15 +125,15 @@ fn test_files_physical_size(#[case] file: &str, #[case] size: u64) {
 #[allow(non_snake_case)]
 #[test]
 fn test_file_size_8KiB() {
-    const DIR: &str = concatcp!(TEST_DATA_DIR, "test_file_size/") as &str;
-    // do not rename it into `_` it would cause immediate destrucion after creation
+    const DIR: &str = concatcp!(TEST_DATA_DIR, "test_file_size/");
+    // do not rename it into `_` it would cause immediate destruction after creation
     let _guard = CleanUpGuard { path: DIR };
 
     // Given
     // Such sizes is selected to be close to filesystem sector size, and to be maximally universal
     // event for FS-es with sector as bif as 8KiB
-    create_file(&concatcp!(DIR, "foo/file.bin") as &str, 8192);
-    create_file(&concatcp!(DIR, "bar/file.bin") as &str, 8192 - 5);
+    create_file(&concatcp!(DIR, "foo/file.bin"), 8192);
+    create_file(&concatcp!(DIR, "bar/file.bin"), 8192 - 5);
 
     // When calculating with apparent size
     let test_path = Path::new(DIR);
@@ -161,7 +159,7 @@ fn test_file_size_8KiB() {
         panic!("Can not get file info");
     }
 
-    // When calculating withOUT apparent size
+    // When calculating without apparent size
     let result = FileInfo::from_path(test_path, false);
 
     // Then
@@ -200,7 +198,7 @@ fn assert_size(file_name: &str, apparent: bool, expected_size: u64) {
         FileInfo::from_path(&Path::new(TEST_DATA_DIR), apparent).unwrap()
     {
         let result = DiskItem::from_analyze(Path::new(file_name), apparent, volume_id)
-            .expect("Shoud be able to get file size");
+            .expect("Should be able to get file size");
 
         assert_eq!(
             expected_size, result.disk_size,

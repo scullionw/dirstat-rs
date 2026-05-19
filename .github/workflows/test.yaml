@@ -1,0 +1,52 @@
+on:
+  pull_request:
+  push:
+    branches:
+      - '**'
+
+#name: Test with Code Coverage
+name: Unit Tests
+
+jobs:
+  test:
+    name: Test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-20.04, windows-latest, macos-11]
+        arch: [x86_64]
+        include:
+          # for windows also test 32-bit binaries,
+          # to be sure that win-api integration is correct.
+          - os: windows-latest
+            arch: i686
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install toolchain
+        run: rustup install stable-${{ matrix.arch }} --profile minimal --no-self-update
+        # needed for windows test, as we are using multiple architectures here
+      - name: Switch toolchain
+        run: rustup default stable-${{ matrix.arch }}
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-dependencies-test
+        with:
+          path: |
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+#            target   <-- this can spead up CI a lot, but could lead to cache to grow indefinitely
+          key: ${{ runner.os }}-${{ matrix.arch }}-build-v2-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
+      - name: Run tests
+        run: cargo test
+
+# orginal example used code coverage and tests reports, but disable it for now
+# https://github.com/BamPeers/rust-ci-github-actions-workflow/blob/main/.github/workflows/test.yaml
+# https://dev.to/bampeers/rust-ci-with-github-actions-1ne9
+# if we would use code coverage, not sure how it should work on cross platform tests,
+# perhaps need to gather coverage files across whole matrix into single post-processing step.
+# and test results as XML requires nightly.
